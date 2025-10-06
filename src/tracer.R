@@ -110,16 +110,31 @@ for (fpath in files) {
   # Find the maximum of the normalized signal, after gentle denoising (i.e.,
   # remove single-point anomalies by rolling median and smooth by rolling mean)
   norm_traces |>
-    sapply(\(x) x |>
+    sapply(\(x){x |>
              rollapply(width = 5, FUN = median, align = "center") |>
              rollapply(width = 5, FUN = mean, align = "center") |>
-             max()) -> max_norm
+             max()}) -> max_norm
   
-  # Kinetics:
-  # --------
+  # 2nd-order Kinetics:
+  # ------------------
   # Onset Time
-  # Rising Time 10-90%
+  # 10-90% Rise Time
   # Half-height width
+  
+  # Find the 10-90% rise time (after gentle denoising)
+  F0_Norm <- norm_traces |> sapply(baseline, b_type, b_param)
+  t10_vals <- F0_Norm + 0.10*(summary_tbl$max_norm - F0_Norm)
+  t90_vals <- F0_Norm + 0.90*(summary_tbl$max_norm - F0_Norm)
+  
+  ROIs |> sapply(\(x){
+    norm_traces[[x]] |>
+      rollapply(width = 5, FUN = median, align = "center") |>
+      rollapply(width = 5, FUN = mean, align = "center") -> smooth_norm
+    time_smooth <- time_vec[5:(length(time_vec)-4)]
+    t10 <- cross_time(time_vec, smooth_norm, t10_vals[x])
+    t90 <- cross_time(time_vec, smooth_norm, t90_vals[x])
+    ifelse(is.na(t10) || is.na(t90), NA_real_, t90 - t10)
+    }) -> rise_time_10_90
   
   # store Descriptive Stats
   summary_tbl <- tibble(cell = ROIs)
@@ -128,6 +143,7 @@ for (fpath in files) {
   summary_tbl$collapse_times <- collapse_times
   summary_tbl$AUCs <- AUCs
   summary_tbl$max_norm <- max_norm
+  summary_tbl$rise_time_10_90 <- rise_time_10_90
   
   # --- Save per-cell summary --------------------------------------------------
   

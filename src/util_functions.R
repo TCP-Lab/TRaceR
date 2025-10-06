@@ -130,10 +130,20 @@ auc <- function(sig, collapse_idx = length(sig) + 1, time_vec)
   }
 }
 
-
-
-
-
+# Find the first time crossing a target value (upward) by linear interpolation
+cross_time <- function(x, y, target)
+{
+  inds <- which(!is.na(y) & y >= target)
+  if (length(inds) == 0) return(NA_real_)
+  idx <- inds[1]
+  if (idx == 1) return(x[1])
+  # linear interpolation between idx-1 and idx
+  t0 <- x[idx - 1]; t1 <- x[idx]
+  y0 <- y[idx - 1]; y1 <- y[idx]
+  if (is.na(y0) || is.na(y1) || y1 == y0) return(t1)
+  t_cross <- t0 + (target - y0) * (t1 - t0)/(y1 - y0)
+  return(t_cross)
+}
 
 
 
