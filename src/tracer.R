@@ -107,13 +107,8 @@ for (fpath in files) {
   # Compute the Area Under the Curve (AUC) up to collapse
   ROIs |> sapply(\(x)auc(norm_traces[[x]], collapse_idx[x], time_vec)) -> AUCs
   
-  # Find the maximum of the normalized signal, after gentle denoising (i.e.,
-  # remove single-point anomalies by rolling median and smooth by rolling mean)
-  norm_traces |>
-    sapply(\(x){x |>
-             rollapply(width = 5, FUN = median, align = "center") |>
-             rollapply(width = 5, FUN = mean, align = "center") |>
-             max()}) -> max_norm
+  # Find the maximum of the normalized (denoised) signal
+  norm_traces |> sapply(\(x) x |> denoise() |> max()) -> max_norm
   
   # 2nd-order Kinetics:
   # ------------------
@@ -121,16 +116,31 @@ for (fpath in files) {
   # 10-90% Rise Time
   # Half-height width
   
-  # Find the 10-90% rise time (after gentle denoising)
+  # Onset Time, defined as the time before the (denoised) signal crosses the
+  # 5-times noise-level of the baseline (five-sigma criterion)
+  
+  # Baseline of the normalize traces
   F0_Norm <- norm_traces |> sapply(baseline, b_type, b_param)
+  # Baseline noise (5x)
+  baseline_length <- ifelse(b_type == "abs", b_param,
+                            ceiling(length(time_vec)*b_param))
+  norm_traces[1:baseline_length,] |> apply(2,sd) |> {\(x)5*x}() -> t5s_vals
+  
+  ROIs |> sapply(\(x){
+    w <- 5
+    norm_traces[[x]] |> denoise(win_width = w) -> smooth_norm
+    time_smooth <- time_vec[w:(length(time_vec)-w+1)]
+    t5s <- cross_time(time_vec, smooth_norm, t5s_vals[x])
+  }) -> onset_time
+  
+  # Find the 10-90% Rise Time (after gentle denoising)
   t10_vals <- F0_Norm + 0.10*(summary_tbl$max_norm - F0_Norm)
   t90_vals <- F0_Norm + 0.90*(summary_tbl$max_norm - F0_Norm)
   
   ROIs |> sapply(\(x){
-    norm_traces[[x]] |>
-      rollapply(width = 5, FUN = median, align = "center") |>
-      rollapply(width = 5, FUN = mean, align = "center") -> smooth_norm
-    time_smooth <- time_vec[5:(length(time_vec)-4)]
+    w <- 5
+    norm_traces[[x]] |> denoise(win_width = w) -> smooth_norm
+    time_smooth <- time_vec[w:(length(time_vec)-w+1)]
     t10 <- cross_time(time_vec, smooth_norm, t10_vals[x])
     t90 <- cross_time(time_vec, smooth_norm, t90_vals[x])
     ifelse(is.na(t10) || is.na(t90), NA_real_, t90 - t10)

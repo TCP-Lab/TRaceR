@@ -145,5 +145,23 @@ cross_time <- function(x, y, target)
   return(t_cross)
 }
 
+# Perform a gentle denoising of a 1D signal: remove single-point anomalies by
+# rolling median and smooth by rolling mean.
+# REMEMBER that the returned numeric vector is always 2*(win_width-1) samples
+# shorter that the original one !!
+denoise <- function(sig, win_width = 5) {
+  sig |>
+    rollapply(width = win_width, FUN = median, align = "center") |>
+    rollapply(width = win_width, FUN = mean, align = "center")
+}
+
+
+
+
+
+
+
+
+
 
 
