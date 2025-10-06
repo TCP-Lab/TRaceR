@@ -1,16 +1,16 @@
 
 
 
-# Safe numeric coercion: possible characters, strings, or empty cells (e.g., as
-# the ones introduced by MetaFluor when pressing F5 for event marking) are
-# converted to NAs.
+# Safe numeric coercion: possible characters, strings, or empty cells (e.g.,
+# such as the ones introduced by MetaFluor when pressing F5 for event marking)
+# are converted to NAs.
 as_num <- function(x) {
   as.numeric(as.character(x))
 }
 
 # Makes a plot of multiple calcium traces, provided that 'df' is a data frame
 # containing ONLY fluorescence signals in all of its columns, while 't_vec' is
-# the corresponding time vector.
+# the corresponding vector of time samples.
 plot_traces <- function(df,
                         t_vec = seq(1, nrow(df), by=1),
                         title = "Traces",
@@ -23,12 +23,12 @@ plot_traces <- function(df,
   
   # Plot traces superimposed
   ggplot(long_df, aes(x = time, y = value, color = cell)) +
-    geom_line(alpha = 0.6, size = 0.6, show.legend = FALSE) +
+    geom_line(alpha = 0.6, linewidth = 1, show.legend = FALSE) +
     theme_minimal() +
     labs(title = title, x = axis_labels[1], y = axis_labels[2])
 }
 
-# Computes the baseline value of a single trace (numeric vector 'sig')
+# Computes the baseline value of a single trace (vector 'sig')
 baseline <- function(sig, type = "abs", param)
 {
   if (type == "abs") {
@@ -45,8 +45,8 @@ baseline <- function(sig, type = "abs", param)
   return(F0)
 }
 
-# Computes the baseline and normalize a single trace (numeric vector)
-normalize <- function(sig, b_type = "abs", b_param)
+# Normalizes a single trace (vector 'sig')
+normalize <- function(sig, b_type = "abs", b_param = 10)
 {
   F0 <- baseline(sig, b_type, b_param)
   (sig - F0) / F0
@@ -81,9 +81,12 @@ normalize <- function(sig, b_type = "abs", b_param)
 #                                           align = "right",
 #                                           fill = NA) |> na.trim() |> extract() |> min()))
 
+# thr = 0.1 empirically detected... try:
 # norm_traces |>
 #   lapply(\(x)convolve(x, rev(c(1, 1, 1, -1, -1, -1)/6), type = "filter")) |>
 #   as.data.frame() |> plot_traces()
+
+# c(1, -1) is equivalent to diff()
 
 extract <- function(sig, win = c(1, 1, 1, -1, -1, -1), thr = 0.1) {
   
@@ -115,7 +118,8 @@ extract <- function(sig, win = c(1, 1, 1, -1, -1, -1), thr = 0.1) {
 
 
 
-# AUC of normalized trace up to collapse (if found) or full duration otherwise
+# AUC of a single normalized trace (vector 'sig') up to collapse (if found) or
+# full duration otherwise
 auc <- function(sig, collapse_idx = length(sig) + 1, time_vec)
 {
   end_idx <- ifelse(is.na(collapse_idx), length(sig), collapse_idx - 1)
@@ -125,8 +129,6 @@ auc <- function(sig, collapse_idx = length(sig) + 1, time_vec)
     NA_real_
   }
 }
-
-
 
 
 
