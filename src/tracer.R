@@ -19,14 +19,14 @@ source("./src/util_functions.R")
 in_dir <- commandArgs(trailingOnly = TRUE)[1]
 out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
-# Interactive debug (from the project root directory)
-in_dir <- "./data/in"
-out_dir <- "./data/out"
+# # Interactive debug (from the project root directory)
+# in_dir <- "./data/in/KU_lessUV_NAC/KU"
+# out_dir <- "./data/out/KU_lessUV_NAC/KU"
 
 # b_type <- "rel"
 # b_param <- 0.10   # fraction of initial samples to compute F0 (first 10%)
 b_type <- "abs"
-b_param <- 50
+b_param <- 10
 
 # --- Data Loading -------------------------------------------------------------
 
@@ -35,7 +35,7 @@ file_pattern <- "\\.csv$"
 files <- list.files(in_dir, pattern = file_pattern, full.names = TRUE)
 if (length(files) == 0) {
   warning(paste("No CSV files found in", in_dir, "input directory."))
-  next  # For final implementation within a super FOR cycling over multiple input dirs
+  quit(status = 1)
 }
 
 # To collect final stats
@@ -44,18 +44,22 @@ all_summary_list <- list()
 # Loop over experiments
 for (fpath in files) {
   
-  
-  # DEBUG !!!!!
-  fpath <- files[1]
-  
   message("Processing: ", fpath)
   fpath |> basename() |> sub(file_pattern, "", x=_) -> exp_id
   
-  # Read entire CSV skipping the first row, and using the second one for heading
-  fpath |> read.csv(header = TRUE,
-                    skip = 1,
-                    check.names = TRUE,
-                    stringsAsFactors = FALSE) |>
+  # Read the entire CSV. Mind the special format:
+  # - , for decimal point
+  # - ; as field separator
+  # - skip the first row
+  # - using the second row for heading
+  # - fileEncoding "UTF-16LE" (with BOM)
+  fpath |> read.table(header = TRUE,
+                      sep = ";",
+                      dec = ",",
+                      skip = 1,
+                      check.names = TRUE,
+                      stringsAsFactors = FALSE,
+                      fileEncoding = "UTF-16LE") |>
     lapply(as_num) |> as.data.frame() -> raw_traces
   # Sanitize heading labels
   colnames(raw_traces)[1] <- "Time"
@@ -68,6 +72,12 @@ for (fpath in files) {
   }
   # Signals are the remaining columns
   raw_traces <- raw_traces[,-1]
+  # Check for and remove constantly-zero traces
+  raw_traces |> sapply(\(x)all(x==0)) |> which() -> null_traces
+  if (length(null_traces) > 0) {
+    raw_traces <- raw_traces[,-null_traces]
+  }
+  # Store ROI names
   ROIs <- colnames(raw_traces)
   
   # --- Plot Raw Traces --------------------------------------------------------
@@ -79,7 +89,7 @@ for (fpath in files) {
   r4tcpl::savePlots(
     \(){print(p_raw)},
     width_px = 2000,
-    figure_Name = paste0(exp_id, "_Raw_traces_"),
+    figure_Name = paste0(exp_id, "_Raw_traces"),
     figure_Folder = out_dir)
   
   # --- Normalize Traces -------------------------------------------------------
@@ -93,7 +103,7 @@ for (fpath in files) {
   r4tcpl::savePlots(
     \(){print(p_norm)},
     width_px = 2000,
-    figure_Name = paste0(exp_id, "_Norm_traces_"),
+    figure_Name = paste0(exp_id, "_Norm_traces"),
     figure_Folder = out_dir)
   
   # --- Collapse Detection -----------------------------------------------------
@@ -101,6 +111,11 @@ for (fpath in files) {
   norm_traces |> sapply(extract) -> collapse_idx
   
   collapse_idx |> sapply(\(x)ifelse(is.na(x), NA_real_, time_vec[x])) -> collapse_times
+  
+  # Check for Debug and thr fine-tuning
+  # norm_traces |>
+  #   lapply(\(x)convolve(x, rev(c(1, 1, 1, -1, -1, -1)/6), type = "filter")) |>
+  #   as.data.frame() |> plot_traces()
   
   # --- Descriptive Stats ------------------------------------------------------
   
@@ -111,7 +126,7 @@ for (fpath in files) {
   norm_traces |> sapply(\(x) x |> denoise() |> max()) -> max_norm
   
   # 2nd-order Kinetics:
-  # ------------------
+  # ~~~~~~~~~~~~~~~~~~
   # Onset Time
   # 10-90% Rise Time
   # Half-height width
@@ -134,8 +149,8 @@ for (fpath in files) {
   }) -> onset_time
   
   # Find the 10-90% Rise Time (after gentle denoising)
-  t10_vals <- F0_Norm + 0.10*(summary_tbl$max_norm - F0_Norm)
-  t90_vals <- F0_Norm + 0.90*(summary_tbl$max_norm - F0_Norm)
+  t10_vals <- F0_Norm + 0.10*(max_norm - F0_Norm)
+  t90_vals <- F0_Norm + 0.90*(max_norm - F0_Norm)
   
   ROIs |> sapply(\(x){
     w <- 5
@@ -157,60 +172,17 @@ for (fpath in files) {
   
   # --- Save per-cell summary --------------------------------------------------
   
-  out_summary_csv <- file.path(out_dir, paste0(exp_id, "_per_cell_stats.csv"))
+  out_summary_csv <- file.path(out_dir, paste0(exp_id, "_perCell_stats.csv"))
   write.csv(summary_tbl, out_summary_csv, row.names = FALSE)
   message("Per-cell stats written to: ", out_summary_csv)
   
-  
-  
-  
-  
-  
-  
-  # Save histograms for each stat
-  stat_names <- c("F0", "collapse_times", "AUCs", "max_norm")
-  hist_plots <- list()
-  for (s in stat_names) {
-    df_plot <- summary_tbl |> select(cell, !!sym(s)) |> rename(value = !!sym(s))
-    p_hist <- ggplot(df_plot, aes(x = value)) +
-      geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.9) +
-      theme_minimal() +
-      labs(title = paste0(exp_id, " — histogram: ", s),
-           x = s, y = "Count")
-    #fname <- file.path(out_dir, paste0(exp_id, "_hist_", s, ".png"))
-    #ggsave(filename = fname, plot = p_hist, width = 7, height = 5)
-    hist_plots[[s]] <- p_hist
-  }
-  
-  hist_plots[[4]]
-  
-  # --- Save per-experiment summary -------------------------------------------- 
-  
-  # Compute summary statistics across cells (mean, sd, sem, median, n) for each stat
-  summary_tbl |>
-    summarize_at(vars(F0, collapse_times, AUCs, max_norm),
-                 list(mean = ~mean(., na.rm = TRUE),
-                      sd   = ~sd(., na.rm = TRUE),
-                      sem  = ~ (sd(., na.rm = TRUE) / sqrt(sum(!is.na(.)))),
-                      median = ~median(., na.rm = TRUE),
-                      n = ~sum(!is.na(.)))) |>
-    pivot_longer(everything(), names_to = "stat_metric", values_to = "value") -> summary_stats
-  
-  
-  out_summary_stats_csv <- file.path(out_dir, paste0(exp_id, "_summary_stats.csv"))
-  write.csv(summary_stats, out_summary_stats_csv, row.names = FALSE)
-  message("Summary stats written to: ", out_summary_stats_csv)
-  
-  # # Save combined per-file RDS of results for programmatic use
-  # saveRDS(list(per_cell = summary_tbl, summary_stats = summary_stats, norm_traces = long_norm),
-  #         file = file.path(out_dir, paste0(exp_id, "_results.rds")))
-  
-  # Collect global list
-  all_summary_list[[exp_id]] <- list(per_cell = summary_tbl, summary_stats = summary_stats)
 }
 
 
-# # Optionally combine all files into a single table and write
-# combined_per_cell <- bind_rows(lapply(all_summary_list, function(x) x$per_cell), .id = "source_file")
-# write.csv(combined_per_cell, file.path(out_dir, "combined_per_cell_stats.csv"), row.names = FALSE)
-# message("Combined per-cell stats saved to: ", file.path(out_dir, "combined_per_cell_stats.csv"))
+
+
+
+
+
+
+
