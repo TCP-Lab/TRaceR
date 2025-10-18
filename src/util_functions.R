@@ -155,7 +155,6 @@ denoise <- function(sig, win_width = 5) {
     rollapply(width = win_width, FUN = mean, align = "center")
 }
 
-
 # --- per-experiment stats -----------------------------------------------------
 
 mean_values <- function(df) {
@@ -210,9 +209,144 @@ na_values <- function(df) {
   df[,idx] |> sapply(\(x)sum(is.na(x))) |> append(rate, after = 3)
 }
 
+# --- Plot Comparisons ---------------------------------------------------------
 
+# Plot boxplots with jittered points of two samples, also  displaying
+# significance as the appropriate number of asterisks above the two boxes
+ttest_boxplot <- function(x,
+                          y,
+                          pval,
+                          group_labels = c("Group1", "Group2"),
+                          xlab = "",
+                          ylab = "",
+                          box.width = 0.3,
+                          jitter.width = 0.15,
+                          point.size = 1.8,
+                          palette = c("#1b9e77", "#d95f02"),
+                          show.p = FALSE,
+                          star.size = 6,
+                          p_digits = 3)
+{
+  # Input sanitation
+  x <- as.numeric(x)
+  y <- as.numeric(y)
+  if (length(group_labels) < 2) group_labels <- c("Group1", "Group2")
+  if (length(x) == 0 || length(y) == 0) stop("Both x and y must contain at least one (non-NA) numeric value.")
+  # Remove NAs
+  x <- x[!is.na(x)]
+  y <- y[!is.na(y)]
+  if (length(x) == 0 || length(y) == 0) stop("After removing NAs, one group is empty.")
 
+  
+  # Map p-value to asterisks (common convention)
+  p_to_stars <- function(p) {
+    if (is.na(p)) return(NA_character_)
+    if (p <= 0.001) return("***")
+    if (p <= 0.01)  return("**")
+    if (p <= 0.05)  return("*")
+    return("")  # no asterisk if not significant at 0.05
+  }
+  stars <- p_to_stars(pval)
+  
+  # Build data.frame for plotting
+  df <- data.frame(
+    value = c(x, y),
+    group = factor(rep(group_labels, times = c(length(x), length(y))), levels = group_labels)
+  )
+  
+  # Compute annotation position (one line spanning group 1 and 2)
+  y_max <- max(df$value, na.rm = TRUE)
+  y_min <- min(df$value, na.rm = TRUE)
+  range_val <- y_max - y_min
+  if (range_val == 0) {
+    # all values equal; choose a small offset
+    h <- abs(y_max) * 0.1
+    if (h == 0) h <- 0.5
+  } else {
+    h <- range_val * 0.15
+  }
+  y_line <- y_max + h
+  y_text <- y_line + h * 0.25
+  
+  # Build the plot
+  plt <- ggplot(df, aes(x = group, y = value, fill = group)) +
+    geom_boxplot(width = box.width, outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(width = jitter.width, size = point.size, alpha = 0.7, aes(color = group)) +
+    scale_fill_manual(values = palette, guide = "none") +
+    scale_color_manual(values = palette, guide = "none") +
+    labs(x = xlab, y = ylab) +
+    theme_minimal(base_size = 14)
+  
+  # Add significance line and stars (only if we have a star string to show; empty string means non-significant)
+  if (!is.na(stars) && stars != "") {
+    plt <- plt +
+      geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 0.6) +
+      geom_segment(aes(x = 1, xend = 1, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 0.6) +
+      geom_segment(aes(x = 2, xend = 2, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 0.6) +
+      annotate("text", x = 1.5, y = y_text, label = stars, size = star.size, fontface = "bold")
+  } else if (!is.na(pval) && show.p) {
+    # Optionally show p-value even if not significant
+    p_label <- paste0("p = ", formatC(pval, digits = p_digits, format = "g"))
+    plt <- plt +
+      geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 0.4, linetype = "dashed") +
+      annotate("text", x = 1.5, y = y_text, label = p_label, size = 6)
+  } else if (is.na(pval) && show.p) {
+    plt <- plt + annotate("text", x = 1.5, y = y_text, label = "p = NA", size = 6)
+  }
+  
+  # If user wants the p-value numeric on the plot in addition to stars, add it
+  if (show.p && !is.na(pval) && stars != "") {
+    p_label <- paste0("p = ", signif(pval, digits = p_digits))
+    plt <- plt + annotate("text", x = 1.5, y = y_text - h * 0.45, label = p_label, size = 6)
+  }
+  
+  return(plt)
+}
 
-
-
-
+# Arrange a list of ggplot objects on a single canvas in an ncol x nrow grid
+arrange_plots_grid <- function(plots,
+                               nrow = 2,
+                               ncol = 4,
+                               tag_levels = NULL,   # e.g. "A" (letters) or "1" (numbers) or NULL (no tags)
+                               title = NULL,
+                               blank_plot = NULL)
+{
+  # accept a single ggplot or a list
+  if (inherits(plots, "gg") || inherits(plots, "ggplot")) {
+    plots <- list(plots)
+  } else if (!is.list(plots)) {
+    stop("'plots' must be a list of ggplot objects or a single ggplot object.")
+  }
+  
+  total_cells <- ncol * nrow
+  n_plots <- length(plots)
+  
+  if (n_plots > total_cells) {
+    warning(sprintf("You provided %d plots but the grid has %d cells: only the first %d plots will be used.",
+                    n_plots, total_cells, total_cells))
+    plots <- plots[1:total_cells]
+  }
+  
+  # create a blank ggplot if needed
+  if (is.null(blank_plot)) {
+    blank_plot <- ggplot() + theme_void()
+  }
+  
+  if (n_plots < total_cells) {
+    plots <- c(plots, rep(list(blank_plot), total_cells - n_plots))
+  }
+  
+  # Build annotation arguments for patchwork::plot_annotation
+  ann_args <- list()
+  if (!is.null(tag_levels)) ann_args$tag_levels <- tag_levels
+  if (!is.null(title)) ann_args$title <- title
+  
+  # Arrange with patchwork
+  combined <- wrap_plots(plots, ncol = ncol, nrow = nrow)
+  if (length(ann_args) > 0) {
+    combined <- combined + do.call(plot_annotation, ann_args)
+  }
+  
+  #invisible(combined)
+  return(combined)
+}

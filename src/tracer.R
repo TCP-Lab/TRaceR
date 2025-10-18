@@ -19,16 +19,18 @@ source("./src/util_functions.R")
 in_dir <- commandArgs(trailingOnly = TRUE)[1]
 out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
-# # Interactive debug (from the project root directory)
-# in_dir <- "./data/in/KU_lessUV_NAC/KU"
-# out_dir <- "./data/out/KU_lessUV_NAC/KU"
+# Interactive debug (from the project root directory)
+in_dir <- "./data/in/KU_lessUV_NAC/KU"
+out_dir <- "./data/out/KU_lessUV_NAC/KU"
 
 # b_type <- "rel"
-# b_param <- 0.10   # fraction of initial samples to compute F0 (first 10%)
+# b_param <- 0.10   # Fraction of initial samples to compute F0 (first 10%)
 b_type <- "abs"
-b_param <- 10
+b_param <- 10     # Number of initial samples to be considered for F0
 
 # --- Data Loading -------------------------------------------------------------
+
+message("Opening ", in_dir)
 
 # List CSVs
 file_pattern <- "\\.csv$"
@@ -37,6 +39,8 @@ files <- list.files(in_dir, pattern = file_pattern,
 if (length(files) == 0) {
   warning(paste("No CSV files found in", in_dir, "input directory."))
   quit(status = 1)
+} else {
+  message("  > ", length(files), " CSV files found.")
 }
 
 # To collect final stats
@@ -184,8 +188,7 @@ for (fpath in files) {
   saveRDS(summary_tbl,
           file = paste0(out_summary, ".rds"))
 
-  message("Per-cell stats written to: ", out_summary)
-  
+  message("  >>> Per-cell stats written to: ", out_summary)
 }
 
 
