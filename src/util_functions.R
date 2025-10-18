@@ -156,8 +156,59 @@ denoise <- function(sig, win_width = 5) {
 }
 
 
+# --- per-experiment stats -----------------------------------------------------
 
+mean_values <- function(df) {
+  # Compute the collapsing rate as percentage of collapsing cells per experiment
+  df$collapse_idx |> is.na() |> {\(x)!x}() |> sum() -> not_NAs
+  rate <- (not_NAs / nrow(df)) * 100
+  names(rate) <- "collapse_rate"
+  # Compute the mean values of all the vars
+  df |> sapply(is.numeric) -> idx
+  df[,idx] |> sapply(mean, na.rm = TRUE) |> append(rate, after = 3)
+}
 
+sd_values <- function(df) {
+  rate <- NA
+  names(rate) <- "collapse_rate"
+  # Compute the SDs of all the vars
+  df |> sapply(is.numeric) -> idx
+  df[,idx] |> sapply(sd, na.rm = TRUE) |> append(rate, after = 3)
+}
+
+sem_values <- function(df) {
+  rate <- NA
+  names(rate) <- "collapse_rate"
+  # Compute the SEMs of all the vars
+  df |> sapply(is.numeric) -> idx
+  df[,idx] |> sapply(\(x){
+    sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
+  }) |> append(rate, after = 3)
+}
+
+median_values <- function(df) {
+  rate <- NA
+  names(rate) <- "collapse_rate"
+  # Compute the SDs of all the vars
+  df |> sapply(is.numeric) -> idx
+  df[,idx] |> sapply(median, na.rm = TRUE) |> append(rate, after = 3)
+}
+
+n_values <- function(df) {
+  rate <- NA
+  names(rate) <- "collapse_rate"
+  # Compute the SDs of all the vars
+  df |> sapply(is.numeric) -> idx
+  df[,idx] |> sapply(\(x)sum(!is.na(x))) |> append(rate, after = 3)
+}
+
+na_values <- function(df) {
+  rate <- NA
+  names(rate) <- "collapse_rate"
+  # Compute the SDs of all the vars
+  df |> sapply(is.numeric) -> idx
+  df[,idx] |> sapply(\(x)sum(is.na(x))) |> append(rate, after = 3)
+}
 
 
 
