@@ -32,7 +32,8 @@ b_param <- 10
 
 # List CSVs
 file_pattern <- "\\.csv$"
-files <- list.files(in_dir, pattern = file_pattern, full.names = TRUE)
+files <- list.files(in_dir, pattern = file_pattern,
+                    full.names = TRUE, ignore.case = TRUE)
 if (length(files) == 0) {
   warning(paste("No CSV files found in", in_dir, "input directory."))
   quit(status = 1)
@@ -89,7 +90,7 @@ for (fpath in files) {
   r4tcpl::savePlots(
     \(){print(p_raw)},
     width_px = 2000,
-    figure_Name = paste0(exp_id, "_Raw_traces"),
+    figure_Name = paste0(exp_id, "_RawTraces"),
     figure_Folder = out_dir)
   
   # --- Normalize Traces -------------------------------------------------------
@@ -103,7 +104,7 @@ for (fpath in files) {
   r4tcpl::savePlots(
     \(){print(p_norm)},
     width_px = 2000,
-    figure_Name = paste0(exp_id, "_Norm_traces"),
+    figure_Name = paste0(exp_id, "_NormTraces"),
     figure_Folder = out_dir)
   
   # --- Collapse Detection -----------------------------------------------------
@@ -172,9 +173,18 @@ for (fpath in files) {
   
   # --- Save per-cell summary --------------------------------------------------
   
-  out_summary_csv <- file.path(out_dir, paste0(exp_id, "_perCell_stats.csv"))
-  write.csv(summary_tbl, out_summary_csv, row.names = FALSE)
-  message("Per-cell stats written to: ", out_summary_csv)
+  out_summary <- file.path(out_dir, paste0(exp_id, "_perCellReport"))
+  
+  # Save per-cell stats
+  write.csv(summary_tbl,
+            file = paste0(out_summary, ".csv"),
+            row.names = FALSE)
+  
+  # Save RDS of results for programmatic use
+  saveRDS(summary_tbl,
+          file = paste0(out_summary, ".rds"))
+
+  message("Per-cell stats written to: ", out_summary)
   
 }
 
