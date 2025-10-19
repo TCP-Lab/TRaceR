@@ -49,7 +49,7 @@ IFS="$OIFS"
 
 # --- The pipeline ends here ---------------------------------------------------
 if [[ $? -eq 0 ]]; then
-    echo -e "${mag}PIPELINE COMPLETED SUCCESSFULLY${end}"
+    echo -e "\n${mag}PIPELINE COMPLETED SUCCESSFULLY${end}"
 else
     echo -e "\n${red}PIPELINE FAILED${end}"
 fi

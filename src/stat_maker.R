@@ -25,12 +25,14 @@ out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
 # --- Data Loading -------------------------------------------------------------
 
+message(" \nOpening Batch: ", out_dir)
+
 # List CSVs
 file_pattern <- "_perCellReport\\.rds$"
 files <- list.files(out_dir, pattern = file_pattern,
                     full.names = TRUE, recursive = TRUE, ignore.case = TRUE)
 if (length(files) == 0) {
-  warning(paste("No experiment reports found in", out_dir, "directory."))
+  warning("No experiment reports found in ", out_dir, " directory.")
   quit(status = 1)
 }
 
@@ -48,18 +50,20 @@ files |> dirname() |> basename() |> unique() -> conditions
 # ...and cycle over them
 for (condition in conditions) {
   
-  message("Processing: ", condition)
+  message(" \nProcessing Condition: ", condition)
 
   # Create an empty data frame for each condition
   matrix(nrow = n_vars, ncol = 0) |> as.data.frame() -> data_points[[condition]]
   
   # Find biological replicates...
-  files |> dirname() |> grep(file.path(out_dir, condition),
-                             x=_, fixed = TRUE) -> idx
+  files |> dirname() |> grep(paste0("^", file.path(out_dir, condition), "$"),
+                             x=_, fixed = FALSE) -> idx
+  message("  > ", length(idx), " experiments found.")
   # ...and cycle over them
   for (i in idx) {
     
     files[i] |> basename() |> sub(file_pattern, "", x=_) -> exp_id
+    message("  >> Processing: ", exp_id)
     
     # --- Experiment Stats -----------------------------------------------------
     
@@ -80,7 +84,8 @@ for (condition in conditions) {
     write.csv(summary_stats,
               file = paste0(out_summary, ".csv"),
               row.names = TRUE)
-    message("Experiment report written to: ", out_summary)
+    message("  >>> Experiment report written to:\n",
+            "      ", out_summary, " (csv)")
     
     # Store in the master list
     data_points[[condition]][[exp_id]] <- summary_stats[, "Mean"]
@@ -91,6 +96,8 @@ for (condition in conditions) {
 }
 
 # --- Hypothesis Testing ------------------------------------------------------- 
+
+message(" \nHypothesis Testing ", out_dir)
 
 # Load the contrasts of interest
 list.files(in_dir,
@@ -108,19 +115,23 @@ comp_files[1] |> read.delim(header = FALSE,
                          sep = "\n",
                          blank.lines.skip = TRUE,
                          comment.char = "#") |> unlist() -> comparisons
+message(length(comparisons), " contrasts to run")
 
 # Make all the planned comparisons
 for (comp in comparisons) {
+  
+  message(" \nContrast: ", comp)
   
   # Parse the contrast
   comp |> strsplit(" -- ") |> unlist() |> {\(x)x[1]}() -> cond
   comp |> strsplit(" -- ") |> unlist() |> {\(x)x[2]}() -> ref
   
-  # Perform t-test, catch errors (e.g., zero variance, low sample size, ...)
+  # Perform t-test, catching errors (e.g., zero variance, low sample size, ...)
+  message("  > Doing the t-test")
   features |> sapply(function(feature) {
     tryCatch(
-      t.test(x = data_points[[cond]][feature,],
-             y = data_points[[ref]][feature,],
+      t.test(x = data_points[[ref]][feature,],
+             y = data_points[[cond]][feature,],
              paired = FALSE,
              var.equal = FALSE,
              alternative = "two.sided")$p.val,
@@ -128,8 +139,8 @@ for (comp in comparisons) {
       )
     }) -> pvals
   
-  
-  
+  # Draw a box plot per feature
+  message("  > Making the box plots")
   features |> lapply(function(feature) {
     ttest_boxplot(data_points[[ref]][feature,],
                   data_points[[cond]][feature,],
@@ -139,6 +150,7 @@ for (comp in comparisons) {
                   show.p = TRUE)
     }) -> ggplots_list
   
+  # Merge all features into a per-contrast graphical report
   ggplots_list |> arrange_plots_grid(nrow = 2,
                                      ncol = 4,
                                      tag_levels = "A",
@@ -150,8 +162,6 @@ for (comp in comparisons) {
     width_px = 2000,
     figure_Name = paste0(comp, "_Combined"),
     figure_Folder = out_dir)
-
-  
 }
 
 

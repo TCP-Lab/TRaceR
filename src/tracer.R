@@ -19,9 +19,9 @@ source("./src/util_functions.R")
 in_dir <- commandArgs(trailingOnly = TRUE)[1]
 out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
-# Interactive debug (from the project root directory)
-in_dir <- "./data/in/KU_lessUV_NAC/KU"
-out_dir <- "./data/out/KU_lessUV_NAC/KU"
+# # Interactive debug (from the project root directory)
+# in_dir <- "./data/in/KU_lessUV_NAC/KU"
+# out_dir <- "./data/out/KU_lessUV_NAC/KU"
 
 # b_type <- "rel"
 # b_param <- 0.10   # Fraction of initial samples to compute F0 (first 10%)
@@ -30,14 +30,14 @@ b_param <- 10     # Number of initial samples to be considered for F0
 
 # --- Data Loading -------------------------------------------------------------
 
-message("Opening ", in_dir)
+message(" \nOpening: ", in_dir)
 
 # List CSVs
 file_pattern <- "\\.csv$"
 files <- list.files(in_dir, pattern = file_pattern,
                     full.names = TRUE, ignore.case = TRUE)
 if (length(files) == 0) {
-  warning(paste("No CSV files found in", in_dir, "input directory."))
+  warning("  > No CSV files found in ", in_dir, " input directory.")
   quit(status = 1)
 } else {
   message("  > ", length(files), " CSV files found.")
@@ -49,7 +49,7 @@ all_summary_list <- list()
 # Loop over experiments
 for (fpath in files) {
   
-  message("Processing: ", fpath)
+  message("  >> Processing: ", basename(fpath))
   fpath |> basename() |> sub(file_pattern, "", x=_) -> exp_id
   
   # Read the entire CSV. Mind the special format:
@@ -73,17 +73,20 @@ for (fpath in files) {
   # Expect first column to be the vector of time samples
   time_vec <- raw_traces$Time
   if (any(is.na(time_vec))) {
-    warning("NAs in Time vector!")
+    warning("  >>> NAs in Time vector!")
   }
   # Signals are the remaining columns
   raw_traces <- raw_traces[,-1]
-  # Check for and remove constantly-zero traces
+  # Search and destroy constantly-zero traces
   raw_traces |> sapply(\(x)all(x==0)) |> which() -> null_traces
   if (length(null_traces) > 0) {
     raw_traces <- raw_traces[,-null_traces]
   }
   # Store ROI names
   ROIs <- colnames(raw_traces)
+  
+  message("  >>> ", ncol(raw_traces), " ROIs x ",
+          nrow(raw_traces), " time samples")
   
   # --- Plot Raw Traces --------------------------------------------------------
   
@@ -175,7 +178,7 @@ for (fpath in files) {
   summary_tbl$max_norm <- max_norm
   summary_tbl$rise_time_10_90 <- rise_time_10_90
   
-  # --- Save per-cell summary --------------------------------------------------
+  # --- Save per-Cell Report ---------------------------------------------------
   
   out_summary <- file.path(out_dir, paste0(exp_id, "_perCellReport"))
   
@@ -188,14 +191,10 @@ for (fpath in files) {
   saveRDS(summary_tbl,
           file = paste0(out_summary, ".rds"))
 
-  message("  >>> Per-cell stats written to: ", out_summary)
+  message("  >>> Per-cell stats written to:\n",
+          "      ", out_summary, " (csv + rds)")
+
 }
-
-
-
-
-
-
 
 
 
