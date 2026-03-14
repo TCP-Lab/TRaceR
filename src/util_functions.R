@@ -1,10 +1,11 @@
 
-
+# --- General ------------------------------------------------------------------
 
 # Safe numeric coercion: possible characters, strings, or empty cells (e.g.,
 # such as the ones introduced by MetaFluor when pressing F5 for event marking)
 # are converted to NAs.
-as_num <- function(x) {
+as_num <- function(x)
+{
   as.numeric(as.character(x))
 }
 
@@ -52,68 +53,113 @@ normalize <- function(sig, b_type = "abs", b_param = 10)
   (sig - F0) / F0
 }
 
+# Find the n-th top-most max within a vector of numbers
+nth.max <- function(x, n)
+{
+  # Double '-' because 'decreasing' options is not available for partial sorting
+  -sort(-x, partial = n)[n]
+}
 
+# Find the position (index) of the n-th top-most max within a vector of numbers
+which.nth.max <- function(x, n)
+{
+  which(x == nth.max(x,n))
+}
 
+# Pad a matrix with zeros to reach a desired dimension
+pad_matrix <- function(M, nrow_target, ncol_target)
+{
+  out <- matrix(0, nrow_target, ncol_target)
+  out[seq_len(nrow(M)), seq_len(ncol(M))] <- M
+  out
+}
 
+# Find the n top-most relative maxima (i.e., peaks) within a signal (numeric
+# vector), in terms of both their values (first output element) and
+# positions/indexes (second output element).
+nth.peaks <- function(x, n, min_h = 5)
+{
+  findpeaks(x,
+            minpeakdistance = 10, # minimum number of samples between peaks
+            minpeakheight = min_h, # ignore peaks below a threshold
+            threshold = 0.5 # required drop from the peak to neighbors
+  ) -> peak_list
+  
+  if(is.null(peak_list)) {
+    peak_list <- matrix(0,1,4) # Standard 'findpeaks' output has 4 columns
+  }
+  if (nrow(peak_list) < n) {
+    peak_list |> pad_matrix(n,4) -> peak_list
+  }
+  
+  peak_list[order(peak_list[,1], decreasing = TRUE)[1:n], ]
+}
 
+# --- Feature extraction -------------------------------------------------------
 
-
-# Feature extraction
-
-# Detects signal collapse in a single trace (vector 'sig') by rolling median.
+# Detects signal collapse in a single trace (vector 'sig') by convolution of a
+# downward step. By using such a step as a convolution window, the signal
+# drop-off is mapped to a (negative) peak, while possible peaks in the original
+# signal are mapped to biphasic spikes, just as in the case of a standard
+# derivative operator... indeed:
 #
-# NOTE: at the edges of the signal, where there are not enough samples to fill
-# the window, rollapply() doesn't make any computation so that the returned
-# vector is a ('rolling_win' - 1)-trimmed version of the original one. On the
-# contrary, rollapply(... , fill = NA) keeps signal's original length by filling
-# with NAs the returned vector. Try, e.g.:
-#    rnorm(10, 1, 1) |> rollapply(5, median, align = "left", fill = NA)
-# align="right" => index j uses: (j - rolling_win + 1) ... (j)
-# align="left"  => index j uses: (j) ... (j + rolling_win - 1)
-# align="center"=> index j uses: (j-(rolling_win-1)/2) ... (j+(rolling_win-1)/2)
-# In this last case (default) an odd-valued length for the rolling window is
-# recommended for a more accurate and predictable behavior.
-
-
-# 
-# norm_traces |> sapply(\(x)(x |> rollapply(width = 5,
-#                                           FUN = median,
-#                                           align = "right",
-#                                           fill = NA) |> na.trim() |> extract() |> min()))
-
-# thr = 0.1 empirically detected... try:
-# norm_traces |>
-#   lapply(\(x)convolve(x, rev(c(1, 1, 1, -1, -1, -1)/6), type = "filter")) |>
-#   as.data.frame() |> plot_traces()
-
-# c(1, -1) is equivalent to diff()
-
-extract <- function(sig, win = c(1, 1, 1, -1, -1, -1), thr = 0.1) {
+#     convolve(x, rev(c(1, -1)), type = "filter")
+#
+# is exactly equivalent to
+#
+#     diff(x)
+#
+# however, a wider convolution window helps make the detection more robust.
+# Based on this, after convolution, it will be sufficient to apply a negative
+# threshold (thr) to identify the collapses, and a "proximity filter" to
+# effectively distinguish such drop-off transients from spikes.
+step_convolve <- function(sig,
+                          median_width = 5, # odd number here, please!
+                          step_win = c(1, 1, 1, -1, -1, -1))
+{
+  win <- step_win / sum(abs(step_win)) # Normalize convolution window
   
   # Pre-filter by a rolling median to remove possible single-time-point spikes,
   # "dropping points", or brief transients, likely due to artifacts from camera
-  # sensors or alike, in any case not representing true collapse events we are
-  # interested in (robust). Median removes spikes, without altering or smoothing
-  # long lasting signal components.
-  # Also reduces the average SD of the derivative (diff) signal
-  
-  # compute rolling median of previous window (aligned to right so index j uses j-rolling_win+1 .. j)
-  rolling_win <- 5 # odd number here, please!
-  sig |> rollapply(width = rolling_win,
+  # sensors or alike, in any case not representing the true collapse events we
+  # are interested in (robustness). Median removes spikes, without altering or
+  # smoothing long-lasting signal components.
+  sig |> rollapply(width = median_width,
                    FUN = median,
-                   align = "center") -> sig
-  
-  
-  win <- win / sum(abs(win))  # normalize
-  sig |> convolve(rev(win), type = "filter") |> 
-    {\(x)c(min(x),which.min(x))}() -> biggest_drop
-  
-  # Both rollapply and convolve (type = "filter") returns a (win-1) shorted signal
-  # We need to correct for them
-  biggest_drop[2] <- biggest_drop[2] + (rolling_win-1)/2 + length(win)/2
-  
-  ifelse(biggest_drop[1] < -thr, biggest_drop[2], NA_integer_)
+                   align = "center") |> convolve(rev(win),
+                                                 type = "filter")
 }
+
+# NOTE: As an additional safeguard, the initial portion of the signal is "muted"
+# and is not included in the detection of collapse events. This prevents the
+# sporadic activity typically observed at the beginning of recordings (in the
+# form of rapid, multiple spikes) from invalidating a subsequent drop-off which,
+# although real, may produce a smaller deflection in the derivative plot.
+extract <- function(sig,
+                    median_width = 5, # odd number here, please!
+                    step_win = c(1, 1, 1, -1, -1, -1),
+                    protect = 0, # to exclude the initial part of the signal (up to index 'protect')
+                    thr = 5)
+{
+  sig |> step_convolve(median_width, step_win) |>
+    {\(x) c(rep(0,protect), x[(protect+1):length(x)])}() |> # cancel the protected part
+    {\(x) c(min(x),which.min(x),nth.peaks(x,3,min_h=thr)[,2])}() -> biggest_drop
+  
+  # Both rollapply(...) and convolve(..., type = "filter") return a
+  # (win-1)-trimmed signal, requiring correction.
+  correct <- function(x){ceiling((x-1)/2)}
+  biggest_drop[2] <- biggest_drop[2] + correct(median_width) + correct(length(step_win))
+  
+  # Exclude points above the negative threshold and those points that have a
+  # top-most maximum within the range 'k*length(step_win)' ("proximity filter").
+  k <- 3
+  ifelse(biggest_drop[1] < -thr &&
+           abs(biggest_drop[2]-biggest_drop[3]) > k*length(step_win) &&
+           abs(biggest_drop[2]-biggest_drop[4]) > k*length(step_win) &&
+           abs(biggest_drop[2]-biggest_drop[5]) > k*length(step_win),
+         biggest_drop[2], NA_integer_)
+}
+
 
 
 
@@ -122,12 +168,25 @@ extract <- function(sig, win = c(1, 1, 1, -1, -1, -1), thr = 0.1) {
 # full duration otherwise
 auc <- function(sig, collapse_idx = length(sig) + 1, time_vec)
 {
+  # Take only the positive parts of the signal (to avoid negative AUCs)
+  sig[sig < 0] <- 0
+  # Set the endpoint
   end_idx <- ifelse(is.na(collapse_idx), length(sig), collapse_idx - 1)
   if (end_idx > 2) {
     trapz(time_vec[1:end_idx], sig[1:end_idx])
   } else {
     NA_real_
   }
+}
+
+# Perform a gentle denoising of a 1D signal: remove single-point anomalies by
+# rolling median and smooth by rolling mean.
+# REMEMBER that the returned numeric vector is always 2*(win_width-1) samples
+# shorter that the original one !!
+denoise <- function(sig, win_width = 5) {
+  sig |>
+    rollapply(width = win_width, FUN = median, align = "center") |>
+    rollapply(width = win_width, FUN = mean, align = "center")
 }
 
 # Find the first time crossing a target value (upward) by linear interpolation
@@ -143,16 +202,6 @@ cross_time <- function(x, y, target)
   if (is.na(y0) || is.na(y1) || y1 == y0) return(t1)
   t_cross <- t0 + (target - y0) * (t1 - t0)/(y1 - y0)
   return(t_cross)
-}
-
-# Perform a gentle denoising of a 1D signal: remove single-point anomalies by
-# rolling median and smooth by rolling mean.
-# REMEMBER that the returned numeric vector is always 2*(win_width-1) samples
-# shorter that the original one !!
-denoise <- function(sig, win_width = 5) {
-  sig |>
-    rollapply(width = win_width, FUN = median, align = "center") |>
-    rollapply(width = win_width, FUN = mean, align = "center")
 }
 
 # --- per-experiment stats -----------------------------------------------------

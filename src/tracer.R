@@ -3,12 +3,11 @@
 # --- Packages -----------------------------------------------------------------
 
 # library(tidyverse)
-
-library(ggplot2)
 library(dplyr, warn.conflicts = FALSE)
-library(zoo, warn.conflicts = FALSE) |> suppressWarnings()     # rollapply()
-library(pracma, warn.conflicts = FALSE) |> suppressWarnings()  # trapz()
-#library(r4tcpl)
+library(ggplot2)
+library(patchwork) # wrap_plots()
+library(zoo, warn.conflicts = FALSE) |> suppressWarnings()    # rollapply()
+library(pracma, warn.conflicts = FALSE) |> suppressWarnings() # trapz(), findpeaks()
 
 # Function loading
 source("./src/util_functions.R")
@@ -21,7 +20,11 @@ out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
 # # Interactive debug (from the project root directory)
 # in_dir <- "./data/in/KU_lessUV_NAC/KU"
+# in_dir <- "./data/in/KU_lessUV_NAC/DMSO_NAC"
+# out_dir <- "./data/out/KU_lessUV_NAC/DMSO_NAC"
 # out_dir <- "./data/out/KU_lessUV_NAC/KU"
+# in_dir <- "./data/in/KU_Gd_CBX/KU"
+# out_dir <- "./data/out/KU_Gd_CBX/KU"
 
 # b_type <- "rel"
 # b_param <- 0.10   # Fraction of initial samples to compute F0 (first 10%)
@@ -97,7 +100,7 @@ for (fpath in files) {
   r4tcpl::savePlots(
     \(){print(p_raw)},
     width_px = 2000,
-    figure_Name = paste0(exp_id, "_RawTraces"),
+    figure_Name = paste0(exp_id, "_1RawTraces"),
     figure_Folder = out_dir)
   
   # --- Normalize Traces -------------------------------------------------------
@@ -111,26 +114,48 @@ for (fpath in files) {
   r4tcpl::savePlots(
     \(){print(p_norm)},
     width_px = 2000,
-    figure_Name = paste0(exp_id, "_NormTraces"),
+    figure_Name = paste0(exp_id, "_2NormTraces"),
     figure_Folder = out_dir)
   
   # --- Collapse Detection -----------------------------------------------------
   
-  norm_traces |> sapply(extract) -> collapse_idx
+  mw <- 5 # width of the median pre-filter (median_width)
+  step_win <- c(1, 1, 1, -1, -1, -1)
+  protect <- 200
+  thr <- 25
+  
+  # Note here the use of RAW traces to allow for absolute thr values!!
+  raw_traces |> sapply(extract, mw, step_win, protect, thr) -> collapse_idx
   
   collapse_idx |> sapply(\(x)ifelse(is.na(x), NA_real_, time_vec[x])) -> collapse_times
   
-  # Check for Debug and thr fine-tuning
-  # norm_traces |>
-  #   lapply(\(x)convolve(x, rev(c(1, 1, 1, -1, -1, -1)/6), type = "filter")) |>
-  #   as.data.frame() |> plot_traces()
+  # Checkpoint for debugging and threshold fine-tuning
+  raw_traces |> lapply(step_convolve, mw, step_win) |> as.data.frame() -> conv_traces
+  conv_traces |> select(which(!is.na(collapse_idx))) |> mutate(threshold = -thr) |>
+    plot_traces(title = paste0("Kept: ", sum(!is.na(collapse_idx))),
+                axis_labels = NULL) -> p_conv_kept
+  conv_traces |> select(which(is.na(collapse_idx))) |> mutate(threshold = -thr) |>
+    plot_traces(title = paste0("Discarded: ", sum(is.na(collapse_idx))),
+                axis_labels = NULL) -> p_conv_disc
+  
+  arrange_plots_grid(list(p_conv_kept, p_conv_disc),
+                     nrow = 2, ncol = 1, tag_levels = NULL,
+                     title = paste0("Total Traces: ", length(collapse_idx)),
+                     blank_plot = NULL) -> p_conv
+  
+  # Save the Plot
+  r4tcpl::savePlots(
+    \(){print(p_conv)},
+    width_px = 2000,
+    figure_Name = paste0(exp_id, "_3ConvTraces"),
+    figure_Folder = out_dir)
   
   # --- Descriptive Stats ------------------------------------------------------
   
   # Compute the Area Under the Curve (AUC) up to collapse
   ROIs |> sapply(\(x)auc(norm_traces[[x]], collapse_idx[x], time_vec)) -> AUCs
   
-  # Find the maximum of the normalized (denoised) signal
+  # Find the maximum of the normalized (and denoised) signal
   norm_traces |> sapply(\(x) x |> denoise() |> max()) -> max_norm
   
   # 2nd-order Kinetics:
