@@ -125,6 +125,10 @@ for (fpath in files) {
   thr <- 25
   
   # Note here the use of RAW traces to allow for absolute thr values!!
+  # It is virtually impossible to define a universal threshold for normalized
+  # traces because the range of the y-axis--being a function of the baseline
+  # values (F0)--is much more variable. However, the drop points do not change
+  # as a result of normalization.
   raw_traces |> sapply(extract, mw, step_win, protect, thr) -> collapse_idx
   
   collapse_idx |> sapply(\(x)ifelse(is.na(x), NA_real_, time_vec[x])) -> collapse_times
@@ -164,35 +168,38 @@ for (fpath in files) {
   # 10-90% Rise Time
   # Half-height width
   
+  # Gentle denoising of the normalized signals
+  w <- 5
+  ROIs |> sapply(\(x)norm_traces[[x]] |> denoise(win_width = w)) -> smooth_norm
+  time_vec[w:(length(time_vec)-w+1)] -> time_smooth
+  
   # Onset Time, defined as the time before the (denoised) signal crosses the
   # 5-times noise-level of the baseline (five-sigma criterion)
-  
-  # Baseline of the normalize traces
-  F0_Norm <- norm_traces |> sapply(baseline, b_type, b_param)
-  # Baseline noise (5x)
   baseline_length <- ifelse(b_type == "abs", b_param,
                             ceiling(length(time_vec)*b_param))
   norm_traces[1:baseline_length,] |> apply(2,sd) |> {\(x)5*x}() -> t5s_vals
   
   ROIs |> sapply(\(x){
-    w <- 5
-    norm_traces[[x]] |> denoise(win_width = w) -> smooth_norm
-    time_smooth <- time_vec[w:(length(time_vec)-w+1)]
-    t5s <- cross_time(time_vec, smooth_norm, t5s_vals[x])
-  }) -> onset_time
+    cross_time(time_smooth, smooth_norm[,x], t5s_vals[x])}) -> onset_time
   
-  # Find the 10-90% Rise Time (after gentle denoising)
-  t10_vals <- F0_Norm + 0.10*(max_norm - F0_Norm)
-  t90_vals <- F0_Norm + 0.90*(max_norm - F0_Norm)
-  
+  # Find the 10-90% Rise Time
+  t10_vals <- 0.10 * max_norm
+  t90_vals <- 0.90 * max_norm
   ROIs |> sapply(\(x){
-    w <- 5
-    norm_traces[[x]] |> denoise(win_width = w) -> smooth_norm
-    time_smooth <- time_vec[w:(length(time_vec)-w+1)]
-    t10 <- cross_time(time_vec, smooth_norm, t10_vals[x])
-    t90 <- cross_time(time_vec, smooth_norm, t90_vals[x])
+    t10 <- cross_time(time_smooth, smooth_norm[,x], t10_vals[x])
+    t90 <- cross_time(time_smooth, smooth_norm[,x], t90_vals[x])
     ifelse(is.na(t10) || is.na(t90), NA_real_, t90 - t10)
     }) -> rise_time_10_90
+  
+  # Half-height width, defined as the time interval between the point at which
+  # the signal reaches half its maximum value and the (eventual) drop-off.
+  t50_vals <- 0.50 * max_norm
+  ROIs |> sapply(\(x){
+    t50 <- cross_time(time_smooth, smooth_norm[,x], t50_vals[x])
+    t_end <- ifelse(is.na(collapse_times),
+                    time_vec[length(time_vec)], collapse_times)
+    ifelse(is.na(t50), NA_real_, t_end - t50)
+  }) -> half_height_width
   
   # store Descriptive Stats
   summary_tbl <- tibble(cell = ROIs)
@@ -201,7 +208,9 @@ for (fpath in files) {
   summary_tbl$collapse_times <- collapse_times
   summary_tbl$AUCs <- AUCs
   summary_tbl$max_norm <- max_norm
+  summary_tbl$onset_time <- onset_time
   summary_tbl$rise_time_10_90 <- rise_time_10_90
+  summary_tbl$half_height_width <- half_height_width
   
   # --- Save per-Cell Report ---------------------------------------------------
   
@@ -218,7 +227,7 @@ for (fpath in files) {
 
   message("  >>> Per-cell stats written to:\n",
           "      ", out_summary, " (csv + rds)")
-
+  
 }
 
 

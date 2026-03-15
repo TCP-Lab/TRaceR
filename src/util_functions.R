@@ -160,15 +160,11 @@ extract <- function(sig,
          biggest_drop[2], NA_integer_)
 }
 
-
-
-
-
 # AUC of a single normalized trace (vector 'sig') up to collapse (if found) or
-# full duration otherwise
+# full duration otherwise.
 auc <- function(sig, collapse_idx = length(sig) + 1, time_vec)
 {
-  # Take only the positive parts of the signal (to avoid negative AUCs)
+  # Take only the positive parts of the signal (no negative AUCs)
   sig[sig < 0] <- 0
   # Set the endpoint
   end_idx <- ifelse(is.na(collapse_idx), length(sig), collapse_idx - 1)
@@ -189,7 +185,8 @@ denoise <- function(sig, win_width = 5) {
     rollapply(width = win_width, FUN = mean, align = "center")
 }
 
-# Find the first time crossing a target value (upward) by linear interpolation
+# Find the first time-point that crosses a reference/target value (upward) using
+# linear interpolation.
 cross_time <- function(x, y, target)
 {
   inds <- which(!is.na(y) & y >= target)
