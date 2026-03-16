@@ -2,13 +2,13 @@
 
 # --- Packages -----------------------------------------------------------------
 
-# library(ggplot2)
+#library(r4tcpl)
+library(stats)
 library(dplyr, warn.conflicts = FALSE)
 library(tidyr)
 #library(tibble)
 library(ggplot2)
 library(patchwork)
-#library(r4tcpl)
 
 # Function loading
 source("./src/util_functions.R")
@@ -19,9 +19,9 @@ source("./src/util_functions.R")
 in_dir <- commandArgs(trailingOnly = TRUE)[1]
 out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
-# # Interactive debug (from the project root directory)
-# in_dir <- "./data/in/KU_lessUV_NAC"
-# out_dir <- "./data/out/KU_lessUV_NAC"
+# Interactive debug (from the project root directory)
+in_dir <- "./data/in/KU_lessUV_NAC"
+out_dir <- "./data/out/KU_lessUV_NAC"
 
 # --- Data Loading -------------------------------------------------------------
 
@@ -52,7 +52,7 @@ for (condition in conditions) {
   
   message(" \nProcessing Condition: ", condition)
 
-  # Create an empty data frame for each condition
+  # Create an empty data frame for each condition to store in the master list
   matrix(nrow = n_vars, ncol = 0) |> as.data.frame() -> data_points[[condition]]
   
   # Find biological replicates...
@@ -69,14 +69,14 @@ for (condition in conditions) {
     
     # Compute summary statistics across cells (mean, SD, SEM, ...) for each var
     readRDS(files[i]) -> summary_tbl
-    data.frame(Mean   = summary_tbl |> mean_values(),
-               SD     = summary_tbl |> sd_values(),
-               SEM    = summary_tbl |> sem_values(),
-               Median = summary_tbl |> median_values(),
-               N      = summary_tbl |> n_values(),
-               NAs    = summary_tbl |> na_values()) -> summary_stats
+    data.frame(Mean   = summary_tbl |> get_stat(mean),
+               SD     = summary_tbl |> get_stat(sd),
+               SEM    = summary_tbl |> get_stat(sem),
+               Median = summary_tbl |> get_stat(median),
+               N      = summary_tbl |> get_stat(get_size),
+               NAs    = summary_tbl |> get_stat(get_nas)) -> summary_stats
     
-    # --- Save Experiment Report -------------------------------------------------
+    # --- Save Experiment Report -----------------------------------------------
   
     # Save experiment report
     out_summary <- file.path(out_dir, condition,

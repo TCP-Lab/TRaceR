@@ -203,56 +203,29 @@ cross_time <- function(x, y, target)
 
 # --- per-experiment stats -----------------------------------------------------
 
-mean_values <- function(df) {
-  # Compute the collapsing rate as percentage of collapsing cells per experiment
-  df$collapse_idx |> is.na() |> {\(x)!x}() |> sum() -> not_NAs
-  rate <- (not_NAs / nrow(df)) * 100
-  names(rate) <- "collapse_rate"
-  # Compute the mean values of all the vars
-  df |> sapply(is.numeric) -> idx
-  df[,idx] |> sapply(mean, na.rm = TRUE) |> append(rate, after = 3)
-}
+# Functions to be called by 'get_stat()'. Dots (...) are important for the
+# 'na.rm = TRUE' argument used within 'sapply()'.
+sem <- function(x, ...) {sd(x, ...) / sqrt(sum(!is.na(x)))}
+get_size <- function(x, ...) {sum(!is.na(x))}
+get_nas <- function(x, ...) {sum(is.na(x))}
 
-sd_values <- function(df) {
-  rate <- NA
+# General function to compute statistics from the 'summary_tbl'
+get_stat <- function(df, FUN, ...)
+{
+  FUN <- match.fun(FUN) # safer pattern
+  
+  if (identical(FUN, mean)) {
+    # Compute the collapsing rate as percentage of drop-offs per experiment
+    df$collapse_idx |> is.na() |> {\(x)!x}() |> sum() -> not_NAs
+    rate <- (not_NAs / nrow(df)) * 100
+  } else {
+    rate <- NA
+  }
   names(rate) <- "collapse_rate"
-  # Compute the SDs of all the vars
+  
+  # Compute the FUN statistics for all the vars
   df |> sapply(is.numeric) -> idx
-  df[,idx] |> sapply(sd, na.rm = TRUE) |> append(rate, after = 3)
-}
-
-sem_values <- function(df) {
-  rate <- NA
-  names(rate) <- "collapse_rate"
-  # Compute the SEMs of all the vars
-  df |> sapply(is.numeric) -> idx
-  df[,idx] |> sapply(\(x){
-    sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
-  }) |> append(rate, after = 3)
-}
-
-median_values <- function(df) {
-  rate <- NA
-  names(rate) <- "collapse_rate"
-  # Compute the SDs of all the vars
-  df |> sapply(is.numeric) -> idx
-  df[,idx] |> sapply(median, na.rm = TRUE) |> append(rate, after = 3)
-}
-
-n_values <- function(df) {
-  rate <- NA
-  names(rate) <- "collapse_rate"
-  # Compute the SDs of all the vars
-  df |> sapply(is.numeric) -> idx
-  df[,idx] |> sapply(\(x)sum(!is.na(x))) |> append(rate, after = 3)
-}
-
-na_values <- function(df) {
-  rate <- NA
-  names(rate) <- "collapse_rate"
-  # Compute the SDs of all the vars
-  df |> sapply(is.numeric) -> idx
-  df[,idx] |> sapply(\(x)sum(is.na(x))) |> append(rate, after = 3)
+  df[,idx] |> sapply(FUN, na.rm = TRUE) |> append(rate, after = 3)
 }
 
 # --- Plot Comparisons ---------------------------------------------------------
