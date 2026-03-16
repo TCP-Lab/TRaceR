@@ -73,6 +73,7 @@ for (condition in conditions) {
                SD     = summary_tbl |> get_stat(sd),
                SEM    = summary_tbl |> get_stat(sem),
                Median = summary_tbl |> get_stat(median),
+               IQR    = summary_tbl |> get_stat(IQR),
                N      = summary_tbl |> get_stat(get_size),
                NAs    = summary_tbl |> get_stat(get_nas)) -> summary_stats
     
