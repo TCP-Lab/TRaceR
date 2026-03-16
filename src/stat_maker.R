@@ -19,9 +19,9 @@ source("./src/util_functions.R")
 in_dir <- commandArgs(trailingOnly = TRUE)[1]
 out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
-# Interactive debug (from the project root directory)
-in_dir <- "./data/in/KU_lessUV_NAC"
-out_dir <- "./data/out/KU_lessUV_NAC"
+# # Interactive debug (from the project root directory)
+# in_dir <- "./data/in/KU_lessUV_NAC"
+# out_dir <- "./data/out/KU_lessUV_NAC"
 
 # --- Data Loading -------------------------------------------------------------
 
@@ -78,7 +78,7 @@ for (condition in conditions) {
                NAs    = summary_tbl |> get_stat(get_nas)) -> summary_stats
     
     # --- Save Experiment Report -----------------------------------------------
-  
+    
     # Save experiment report
     out_summary <- file.path(out_dir, condition,
                            paste0(exp_id, "_ExperimentReport"))
@@ -113,10 +113,14 @@ if (length(comp_files) == 0) {
   cat("WARNING: multiple comparison definitions available: taking one...")
 }
 comp_files[1] |> read.delim(header = FALSE,
-                         sep = "\n",
-                         blank.lines.skip = TRUE,
-                         comment.char = "#") |> unlist() -> comparisons
+                            sep = "\n",
+                            blank.lines.skip = TRUE,
+                            comment.char = "#") |> unlist() -> comparisons
 message(length(comparisons), " contrasts to run")
+
+# Select the Features Of Interest (fois)
+fois <- c("F0", "max_norm", "collapse_rate", "collapse_times",
+          "AUCs", "onset_time", "rise_time_10_90", "half_height_width")
 
 # Make all the planned comparisons
 for (comp in comparisons) {
@@ -129,7 +133,7 @@ for (comp in comparisons) {
   
   # Perform t-test, catching errors (e.g., zero variance, low sample size, ...)
   message("  > Doing the t-test")
-  features |> sapply(function(feature) {
+  fois |> sapply(function(feature) {
     tryCatch(
       t.test(x = data_points[[ref]][feature,],
              y = data_points[[cond]][feature,],
@@ -142,7 +146,7 @@ for (comp in comparisons) {
   
   # Draw a box plot per feature
   message("  > Making the box plots")
-  features |> lapply(function(feature) {
+  fois |> lapply(function(feature) {
     ttest_boxplot(data_points[[ref]][feature,],
                   data_points[[cond]][feature,],
                   pvals[feature],

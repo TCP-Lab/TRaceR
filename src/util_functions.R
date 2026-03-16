@@ -201,7 +201,7 @@ cross_time <- function(x, y, target)
   return(t_cross)
 }
 
-# --- per-experiment stats -----------------------------------------------------
+# --- per-Experiment stats -----------------------------------------------------
 
 # Functions to be called by 'get_stat()'. Dots (...) are important for the
 # 'na.rm = TRUE' argument used within 'sapply()'.
@@ -250,12 +250,14 @@ ttest_boxplot <- function(x,
   x <- as.numeric(x)
   y <- as.numeric(y)
   if (length(group_labels) < 2) group_labels <- c("Group1", "Group2")
-  if (length(x) == 0 || length(y) == 0) stop("Both x and y must contain at least one (non-NA) numeric value.")
-  # Remove NAs
+  # Remove NAs and NaNs
   x <- x[!is.na(x)]
   y <- y[!is.na(y)]
-  if (length(x) == 0 || length(y) == 0) stop("After removing NAs, one group is empty.")
-
+  if (length(x) == 0 || length(y) == 0) {
+    message("After removing NAs, one group is empty.")
+    return(ggplot() + theme_void() +
+             annotate("text", x = 0, y = 0, label = "No data available"))
+  }
   
   # Map p-value to asterisks (common convention)
   p_to_stars <- function(p) {
