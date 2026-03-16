@@ -21,11 +21,18 @@ out_dir <- commandArgs(trailingOnly = TRUE)[2]
 
 # # Interactive debug (from the project root directory)
 # in_dir <- "./data/in/KU_lessUV_NAC/KU"
+# out_dir <- "./data/out/KU_lessUV_NAC/KU"
+#
 # in_dir <- "./data/in/KU_lessUV_NAC/DMSO_NAC"
 # out_dir <- "./data/out/KU_lessUV_NAC/DMSO_NAC"
-# out_dir <- "./data/out/KU_lessUV_NAC/KU"
+#
 # in_dir <- "./data/in/KU_Gd_CBX/KU"
 # out_dir <- "./data/out/KU_Gd_CBX/KU"
+#
+# in_dir <- "./data/in/KU_OMO/KU"
+# out_dir <- "./data/out/KU_OMO/KU"
+
+
 
 # b_type <- "rel"
 # b_param <- 0.10   # Fraction of initial samples to compute F0 (first 10%)
@@ -90,19 +97,25 @@ for (fpath in files) {
   ROIs <- colnames(raw_traces)
   
   message("  >>> ", ncol(raw_traces), " ROIs x ",
-          nrow(raw_traces), " time samples")
+          nrow(raw_traces), " time samples - fluoIQR (a.u.): ",
+          round(IQR(unlist(raw_traces), na.rm = TRUE), digits = 2))
   
   # --- Plot Raw Traces --------------------------------------------------------
   
   p_raw <- plot_traces(raw_traces, time_vec,
                        title = paste("Raw traces:", exp_id),
                        axis_labels = c("Time (s)", "Raw fluorescence (a.u.)"))
+  
   # Save the Plot
   r4tcpl::savePlots(
     \(){print(p_raw)},
     width_px = 2000,
     figure_Name = paste0(exp_id, "_1RawTraces"),
-    figure_Folder = out_dir)
+    figure_Folder = out_dir,
+    pdf_out = TRUE,
+    png_out = TRUE) # This (default) option sometimes (!) triggers the following
+                    # annoying warning on stderr: "Fontconfig warning: using
+                    # without calling FcInit()" which I cannot suppress in any way.
   
   # --- Normalize Traces -------------------------------------------------------
   

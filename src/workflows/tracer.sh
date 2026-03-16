@@ -40,7 +40,7 @@ done
 echo -e "\n${grn}STEP 2: Stat_Maker${end}"
 for sub_folder in $(find "${out_path}" -mindepth 1 -maxdepth 1 -type d | sort)
 do
-	# Run the TRaceR
+	# Do the Statistics
 	Rscript --vanilla "./src/stat_maker.R" \
 		"${sub_folder/\/data\/out\//\/data\/in\/}" \
 		"$sub_folder"

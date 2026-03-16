@@ -1,6 +1,21 @@
 
 # --- General ------------------------------------------------------------------
 
+# Robust wrapper to make a function completely silent while still returning the
+# result. This allow suppressing messages, warnings, printed output, and package
+# startup messages... but not ERRORS, which will still stop execution, as it is
+# usually desirable.
+silent <- function(expr) {
+  invisible(capture.output(
+    suppressMessages(
+      suppressWarnings(
+        result <- eval.parent(substitute(expr))
+      )
+    )
+  ))
+  result
+}
+
 # Safe numeric coercion: possible characters, strings, or empty cells (e.g.,
 # such as the ones introduced by MetaFluor when pressing F5 for event marking)
 # are converted to NAs.
