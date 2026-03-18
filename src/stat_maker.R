@@ -133,23 +133,45 @@ for (comp in comparisons) {
   
   # Perform t-test, catching errors (e.g., zero variance, low sample size, ...)
   message("  > Doing the t-test")
+  
+  # arcsine square-root transformation to stabilize variance
+  asin_sqrt <- function(x) {asin(sqrt(x/100))}
+  
   fois |> sapply(function(feature) {
+    x <- as.numeric(data_points[[ref]][feature,])
+    y <- as.numeric(data_points[[cond]][feature,])
+    if (feature == "collapse_rate") {
+      x <- asin_sqrt(x)
+      y <- asin_sqrt(y)
+    }
     tryCatch(
-      t.test(x = data_points[[ref]][feature,],
-             y = data_points[[cond]][feature,],
+      t.test(x = x,
+             y = y,
              paired = FALSE,
              var.equal = FALSE,
              alternative = "two.sided")$p.val,
       error = function(e) NA_real_
       )
-    }) -> pvals
+    }) -> pvals_t
+  
+  # Perform Wilcoxon Rank-Sum (aka Mann-Whitney U) test
+  message("  > Doing the U-test")
+  fois |> sapply(function(feature) {
+    tryCatch(
+      wilcox.test(x = as.numeric(data_points[[ref]][feature,]),
+                  y = as.numeric(data_points[[cond]][feature,]),
+                  paired = FALSE,
+                  alternative = "two.sided")$p.val,
+      error = function(e) NA_real_
+    )
+  }) -> pvals_U
   
   # Draw a box plot per feature
   message("  > Making the box plots")
   fois |> lapply(function(feature) {
     ttest_boxplot(data_points[[ref]][feature,],
                   data_points[[cond]][feature,],
-                  pvals[feature],
+                  pvals_t[feature],
                   group_labels = c(ref, cond),
                   ylab = feature,
                   show.p = TRUE)
