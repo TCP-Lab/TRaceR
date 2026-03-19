@@ -169,10 +169,11 @@ for (comp in comparisons) {
   # Draw a box plot per feature
   message("  > Making the box plots")
   fois |> lapply(function(feature) {
-    ttest_boxplot(data_points[[ref]][feature,],
-                  data_points[[cond]][feature,],
-                  pvals_t[feature],
+    ttest_boxplot(x = data_points[[ref]][feature,],
+                  y = data_points[[cond]][feature,],
                   group_labels = c(ref, cond),
+                  t.pval = pvals_t[feature],
+                  U.pval = pvals_U[feature],
                   ylab = feature,
                   show.p = TRUE)
     }) -> ggplots_list

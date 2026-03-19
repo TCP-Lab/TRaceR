@@ -245,14 +245,28 @@ get_stat <- function(df, FUN, ...)
 
 # --- Plot Comparisons ---------------------------------------------------------
 
+# Map p-values to asterisks (common convention)
+p_to_stars <- function(p, symb = "*")
+{
+  if (is.na(p))   return(NA_character_)
+  if (p <= 0.001) return(paste(rep(symb,3), collapse = ""))
+  if (p <= 0.01)  return(paste(rep(symb,2), collapse = ""))
+  if (p <= 0.05)  return(paste(rep(symb,1), collapse = ""))
+  return("")  # no asterisk if not significant at 0.05
+}
+
+# Is the 'p_to_stars' output from a significant comparison
+is.sig <- function(stars) { !is.na(stars) && stars != "" }
+
 # Plot boxplots with jittered points of two samples, also  displaying
 # significance as the appropriate number of asterisks above the two boxes
 ttest_boxplot <- function(x,
                           y,
-                          pval,
-                          group_labels = c("Group1", "Group2"),
                           xlab = "",
                           ylab = "",
+                          group_labels = c("Group1", "Group2"),
+                          t.pval = NA_real_,
+                          U.pval = NA_real_,
                           box.width = 0.3,
                           jitter.width = 0.15,
                           point.size = 1.8,
@@ -274,15 +288,11 @@ ttest_boxplot <- function(x,
              annotate("text", x = 0, y = 0, label = "No data available"))
   }
   
-  # Map p-value to asterisks (common convention)
-  p_to_stars <- function(p) {
-    if (is.na(p)) return(NA_character_)
-    if (p <= 0.001) return("***")
-    if (p <= 0.01)  return("**")
-    if (p <= 0.05)  return("*")
-    return("")  # no asterisk if not significant at 0.05
-  }
-  stars <- p_to_stars(pval)
+  # p-values and stars
+  pvals <- c(t = unname(t.pval),
+             U = unname(U.pval))
+  stars <- c(t = p_to_stars(t.pval),
+             U = p_to_stars(U.pval, "+"))
   
   # Build data.frame for plotting
   df <- data.frame(
@@ -302,38 +312,46 @@ ttest_boxplot <- function(x,
     h <- range_val * 0.15
   }
   y_line <- y_max + h
-  y_text <- y_line + h * 0.25
+  y_t.stars <- y_line + h * 0.50
+  y_U.stars <- y_line + h * 0.25
+  y_t.text <- y_line - h * 0.25
+  y_U.text <- y_line - h * 0.75
   
   # Build the plot
   plt <- ggplot(df, aes(x = group, y = value, fill = group)) +
-    geom_boxplot(width = box.width, outlier.shape = NA, alpha = 0.6) +
-    geom_jitter(width = jitter.width, size = point.size, alpha = 0.7, aes(color = group)) +
+    geom_boxplot(width = box.width, linewidth = 0.7, outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(width = jitter.width, height = 0, size = point.size, alpha = 0.7, aes(color = group)) +
     scale_fill_manual(values = palette, guide = "none") +
     scale_color_manual(values = palette, guide = "none") +
     labs(x = xlab, y = ylab) +
     theme_minimal(base_size = 14)
   
-  # Add significance line and stars (only if we have a star string to show; empty string means non-significant)
-  if (!is.na(stars) && stars != "") {
+  # Add significance line and stars (only if we have a star string to show)
+  if (is.sig(stars["t"]) || is.sig(stars["U"])) {
     plt <- plt +
-      geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 0.6) +
-      geom_segment(aes(x = 1, xend = 1, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 0.6) +
-      geom_segment(aes(x = 2, xend = 2, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 0.6) +
-      annotate("text", x = 1.5, y = y_text, label = stars, size = star.size, fontface = "bold")
-  } else if (!is.na(pval) && show.p) {
-    # Optionally show p-value even if not significant
-    p_label <- paste0("p = ", formatC(pval, digits = p_digits, format = "g"))
-    plt <- plt +
-      geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 0.4, linetype = "dashed") +
-      annotate("text", x = 1.5, y = y_text, label = p_label, size = 6)
-  } else if (is.na(pval) && show.p) {
-    plt <- plt + annotate("text", x = 1.5, y = y_text, label = "p = NA", size = 6)
+      geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 1) +
+      geom_segment(aes(x = 1, xend = 1, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 1) +
+      geom_segment(aes(x = 2, xend = 2, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 1) +
+      annotate("text", x = 1.5, y = y_t.stars, label = stars["t"], size = star.size, fontface = "bold") +
+      annotate("text", x = 1.5, y = y_U.stars, label = stars["U"], size = star.size, fontface = "bold")
   }
   
-  # If user wants the p-value numeric on the plot in addition to stars, add it
-  if (show.p && !is.na(pval) && stars != "") {
-    p_label <- paste0("p = ", signif(pval, digits = p_digits))
-    plt <- plt + annotate("text", x = 1.5, y = y_text - h * 0.45, label = p_label, size = 6)
+  # Optionally show actual p-values (even if not significant)
+  if (show.p) {
+    for (test in names(pvals)) {
+      if (!is.na(pvals[test])) {
+        p_label <- paste0("p[", test, "] = ", formatC(pvals[test], digits = p_digits, format = "g"))
+        if (stars[test] == "") {
+          plt <- plt +
+            geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 0.4, linetype = "dashed")
+        }
+        plt <- plt +
+          annotate("text", x = 1.5, y = ifelse(test == "t", y_t.text, y_U.text), label = p_label, size = 4)
+      } else {
+        plt <- plt +
+          annotate("text", x = 1.5, y = ifelse(test == "t", y_t.text, y_U.text), label = "p = NA", size = 4)
+      }
+    }
   }
   
   return(plt)
