@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#? Multiparametric Calcium Trace Analyzer
+#? TRaceR - Statistical Analysis Only
 # ==============================================================================
  
 # --- General settings and variables -------------------------------------------
@@ -18,7 +18,6 @@ if [ ! -d "$out_path" ]; then
   mkdir -p "$out_path"
 fi
 
-echo -e "\n${grn}STEP 1: TRaceR${end}"
 # To loop through files with spaces in their names or paths, change the default
 # IFS `$' \n\t'` with the less eager `$'\n'` to properly parse `find` output.
 OIFS="$IFS"
