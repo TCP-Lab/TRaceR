@@ -326,30 +326,34 @@ ttest_boxplot <- function(x,
     labs(x = xlab, y = ylab) +
     theme_minimal(base_size = 14)
   
-  # Add significance line and stars (only if we have a star string to show)
+  # Add significance line and stars (if we have a star string to show)
   if (is.sig(stars["t"]) || is.sig(stars["U"])) {
     plt <- plt +
-      geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 1) +
-      geom_segment(aes(x = 1, xend = 1, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 1) +
-      geom_segment(aes(x = 2, xend = 2, y = y_line, yend = y_line - h * 0.08), inherit.aes = FALSE, size = 1) +
+      annotate("segment", x = 1, xend = 2, y = y_line, yend = y_line, linewidth = 1) +
+      annotate("segment", x = 1, xend = 1, y = y_line, yend = y_line - h * 0.08, linewidth = 1) +
+      annotate("segment", x = 2, xend = 2, y = y_line, yend = y_line - h * 0.08, linewidth = 1) +
       annotate("text", x = 1.5, y = y_t.stars, label = stars["t"], size = star.size, fontface = "bold") +
       annotate("text", x = 1.5, y = y_U.stars, label = stars["U"], size = star.size, fontface = "bold")
   }
   
   # Optionally show actual p-values (even if not significant)
   if (show.p) {
+    if (all(stars == "" | is.na(stars))) {
+      plt <- plt +
+        annotate("segment", x = 1, xend = 2, y = y_line, yend = y_line,
+                 linewidth = 0.4, linetype = "dashed")
+    }
     for (test in names(pvals)) {
       if (!is.na(pvals[test])) {
-        p_label <- paste0("p[", test, "] = ", formatC(pvals[test], digits = p_digits, format = "g"))
-        if (stars[test] == "") {
-          plt <- plt +
-            geom_segment(aes(x = 1, xend = 2, y = y_line, yend = y_line), inherit.aes = FALSE, size = 0.4, linetype = "dashed")
-        }
+        p_label <- paste0("p[", test, "] = ",
+                          formatC(pvals[test], digits = p_digits, format = "g"))
         plt <- plt +
-          annotate("text", x = 1.5, y = ifelse(test == "t", y_t.text, y_U.text), label = p_label, size = 4)
+          annotate("text", x = 1.5, y = ifelse(test == "t", y_t.text, y_U.text),
+                   label = p_label, size = 4)
       } else {
         plt <- plt +
-          annotate("text", x = 1.5, y = ifelse(test == "t", y_t.text, y_U.text), label = "p = NA", size = 4)
+          annotate("text", x = 1.5, y = ifelse(test == "t", y_t.text, y_U.text),
+                   label = "p = NA", size = 4)
       }
     }
   }

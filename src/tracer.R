@@ -4,8 +4,8 @@
 
 #library(r4tcpl)
 #library(tidyverse)
-library(dplyr, warn.conflicts = FALSE)
-library(ggplot2)
+library(dplyr, warn.conflicts = FALSE) |> suppressWarnings()
+library(ggplot2, warn.conflicts = FALSE) |> suppressWarnings()
 library(patchwork) # wrap_plots()
 library(zoo, warn.conflicts = FALSE) |> suppressWarnings()    # rollapply()
 library(pracma, warn.conflicts = FALSE) |> suppressWarnings() # trapz(), findpeaks()

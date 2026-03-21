@@ -4,10 +4,10 @@
 
 #library(r4tcpl)
 library(stats)
-library(dplyr, warn.conflicts = FALSE)
-library(tidyr)
+library(dplyr, warn.conflicts = FALSE) |> suppressWarnings()
+library(tidyr, warn.conflicts = FALSE) |> suppressWarnings()
 #library(tibble)
-library(ggplot2)
+library(ggplot2, warn.conflicts = FALSE) |> suppressWarnings()
 library(patchwork)
 
 # Function loading
