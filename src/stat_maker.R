@@ -143,6 +143,12 @@ for (comp in comparisons) {
   comp |> strsplit(" -- ") |> unlist() |> {\(x)x[1]}() -> cond
   comp |> strsplit(" -- ") |> unlist() |> {\(x)x[2]}() -> ref
   
+  # Check group name consistency
+  if(any(! c(cond, ref) %in% names(data_points))) {
+    warning(paste0("Inconsisten group names in comparison (", comp, "). Contrast skipped!"))
+    next
+  }
+  
   # Perform t-test, catching errors (e.g., zero variance, low sample size, ...)
   message("  > Doing the t-test")
   
