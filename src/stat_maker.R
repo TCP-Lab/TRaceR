@@ -77,8 +77,6 @@ for (condition in conditions) {
                N      = summary_tbl |> get_stat(get_size),
                NAs    = summary_tbl |> get_stat(get_nas)) -> summary_stats
     
-    # --- Save Experiment Report -----------------------------------------------
-    
     # Save experiment report
     out_summary <- file.path(out_dir, condition,
                            paste0(exp_id, "_ExperimentReport"))
@@ -94,6 +92,20 @@ for (condition in conditions) {
   # Add row names to each dataframe
   features <- rownames(summary_stats)
   rownames(data_points[[condition]]) <- features
+  
+  # Export data points for possible third-party replotting
+  con <- file(file.path(out_dir,
+                        paste0("Batch_(",basename(out_dir),")_MeanPoints.csv")),
+              open = "wt")
+  for (i in seq_along(data_points)) {
+    writeLines(paste0("### Condition ", names(data_points)[i]), con)
+    write.table(data_points[[i]], con, sep = ",",
+                row.names = TRUE, col.names = NA)
+    # "By default there is no column name for a column of row names.
+    # If col.names = NA and row.names = TRUE a blank column name is added..."
+    writeLines("", con)
+  }
+  close(con)
 }
 
 # --- Hypothesis Testing ------------------------------------------------------- 
