@@ -1,6 +1,8 @@
 # Specials
 notes.txt
 log*.txt
+/reports/
+/ref/
 
 .kerblam
 # History files
