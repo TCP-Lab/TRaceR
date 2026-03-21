@@ -32,8 +32,6 @@ out_dir <- commandArgs(trailingOnly = TRUE)[2]
 # in_dir <- "./data/in/KU_OMO/KU"
 # out_dir <- "./data/out/KU_OMO/KU"
 
-
-
 # b_type <- "rel"
 # b_param <- 0.10   # Fraction of initial samples to compute F0 (first 10%)
 b_type <- "abs"

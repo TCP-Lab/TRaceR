@@ -145,7 +145,7 @@ for (comp in comparisons) {
   
   # Check group name consistency
   if(any(! c(cond, ref) %in% names(data_points))) {
-    warning(paste0("Inconsisten group names in comparison (", comp, "). Contrast skipped!"))
+    warning(paste0("Inconsistent group names in comparison (", comp, "). Contrast skipped!"))
     next
   }
   
@@ -185,7 +185,7 @@ for (comp in comparisons) {
   }) -> pvals_U
   
   # Draw a box plot per feature
-  message("  > Making the box plots")
+  message("  > Making box plots")
   fois |> lapply(function(feature) {
     ttest_boxplot(x = data_points[[ref]][feature,],
                   y = data_points[[cond]][feature,],
@@ -201,7 +201,6 @@ for (comp in comparisons) {
                                      ncol = 4,
                                      tag_levels = "A",
                                      title = comp) -> combined
-  
   # Save the Plot
   r4tcpl::savePlots(
     \(){print(combined)},
@@ -209,9 +208,4 @@ for (comp in comparisons) {
     figure_Name = paste0(comp, "_Combined"),
     figure_Folder = out_dir)
 }
-
-
-
-
-
 
