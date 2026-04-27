@@ -8,11 +8,12 @@ kerblam run tracer
 ```
 to get the final output.
 
+A run-time log will be printed on screen, but it is not saved anywhere by default.
 Run
 ```bash
-kerblam run tracer 2>&1 | tee log.txt
+kerblam run tracer 2>&1 | tee ./data/out/log.txt
 ```
-to also locally save the onscreen log.
+to save it locally.
 
 You can also run `stat_tracer :: TRaceR - Statistical Analysis Only` if you want to run only the statistical analysis step, following the time course analysis.
 

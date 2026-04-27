@@ -110,6 +110,11 @@ nth.peaks <- function(x, n, min_h = 5)
   peak_list[order(peak_list[,1], decreasing = TRUE)[1:n], ]
 }
 
+# Get a stable estimate of signal noise
+noise_estim <- function(sig) {
+  sig |> step_convolve() |> IQR()
+}
+
 # --- Feature extraction -------------------------------------------------------
 
 # Detects signal collapse in a single trace (vector 'sig') by convolution of a

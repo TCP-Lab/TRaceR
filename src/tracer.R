@@ -9,6 +9,7 @@ library(ggplot2, warn.conflicts = FALSE) |> suppressWarnings()
 library(patchwork) # wrap_plots()
 library(zoo, warn.conflicts = FALSE) |> suppressWarnings()    # rollapply()
 library(pracma, warn.conflicts = FALSE) |> suppressWarnings() # trapz(), findpeaks()
+#library(signal) # Butterworth filter
 
 # Function loading
 source("./src/util_functions.R")
@@ -84,6 +85,7 @@ for (fpath in files) {
   if (any(is.na(time_vec))) {
     warning("  >>> NAs in Time vector!")
   }
+  time_vec |> diff() |> median() -> dt # Sampling time
   # Signals are the remaining columns
   raw_traces <- raw_traces[,-1]
   # Search and destroy constantly-zero traces
@@ -95,7 +97,8 @@ for (fpath in files) {
   ROIs <- colnames(raw_traces)
   
   message("  >>> ", ncol(raw_traces), " ROIs x ",
-          nrow(raw_traces), " time samples - fluoIQR (a.u.): ",
+          nrow(raw_traces), " time samples",
+          " (dt = ", round(dt, digits = 3), " s) - fluoIQR (a.u.): ",
           round(IQR(unlist(raw_traces), na.rm = TRUE), digits = 2))
   
   # --- Plot Raw Traces --------------------------------------------------------
@@ -134,7 +137,12 @@ for (fpath in files) {
   mw <- 5 # width of the median pre-filter (median_width)
   step_win <- c(1, 1, 1, -1, -1, -1)
   protect <- 200
-  thr <- 25
+  thr <- 10
+  
+  
+  raw_traces |> sapply(\(x) x |> step_convolve() |> IQR()) |> median() -> average_noise
+  message("  >>> Average noise estimate: ", round(average_noise, digits = 3))
+  thr <- 7*average_noise
   
   # Note here the use of RAW traces to allow for absolute thr values!!
   # It is virtually impossible to define a universal threshold for normalized
