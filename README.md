@@ -109,7 +109,6 @@ Blank lines allowed, as well as comment lines introduced by `#`.
 ### Recording Length
 The standard duration of each experiment should be exactly 900 seconds, at a sampling rate of 1 second.
 The following files are exceptions.
-However, given the particular experimental condition they belong to (eliciting just small or no responses), we believe they do not introduce statistical artifacts.
 
 Only **600 time samples** for `./data/in/KU_lessUV_NAC/DMSO` experiments
 - 250908_011_DMSO.csv
@@ -119,12 +118,15 @@ Only **600 time samples** for `./data/in/KU_lessUV_NAC/DMSO` experiments
 Only **700 time samples** for `./data/in/KU_lessUV_NAC/KU_NAC` experiments
 - 250908_045_KU_NAC.csv
 
+However, given the particular experimental condition they belong to (eliciting just small or no responses), we believe they do not introduce statistical artifacts.
+
 In fact, recordings from `./data/in/KU_TROL500/KU_TROL500_30m`
 - 260329b_510_KU_TROL500_30m.csv
 - 260329b_511_KU_TROL500_30m.csv
 - 260329b_610_KU_TROL500_30m.csv
 - 260329b_611_KU_TROL500_30m.csv
-are the only ones that cannot be compared with the others, as they are twice as long as the standard duration (30 minutes vs 900 seconds).
+
+are the only ones that cannot be compared with the others, featuring large-amplitude calcium signals, but being twice as long as the standard duration (30 minutes vs 900 seconds).
 
 ### CSV separators
 `./data/in/KU_OMO/KU/251113_011_KU.csv` was the only CSV input file with a different separator convention, even though it used the same file encoding, `UTF-16LE` (with BOM).
