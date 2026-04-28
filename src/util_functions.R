@@ -30,7 +30,9 @@ as_num <- function(x)
 plot_traces <- function(df,
                         t_vec = seq(1, nrow(df), by=1),
                         title = "Traces",
-                        axis_labels = c("x", "y"))
+                        axis_labels = c("x", "y"),
+                        x_marks = NULL,
+                        y_marks = NULL)
 {
   # Prepare data frame in long format for plotting
   colnames(df) |>
@@ -38,10 +40,45 @@ plot_traces <- function(df,
     bind_rows() -> long_df
   
   # Plot traces superimposed
-  ggplot(long_df, aes(x = time, y = value, color = cell)) +
+  plt <- ggplot(long_df, aes(x = time, y = value, color = cell)) +
     geom_line(alpha = 0.6, linewidth = 1, show.legend = FALSE) +
     theme_minimal() +
     labs(title = title, x = axis_labels[1], y = axis_labels[2])
+  
+  # Optional black tick markers.
+  # If only x_marks is provided, put ticks close to the top of the y-range.
+  # If y_marks is also provided, use each corresponding y coordinate.
+  x_marks <- na.omit(x_marks)
+  y_marks <- na.omit(y_marks)
+  if (!is.null(x_marks)) {
+    if (!is.null(y_marks) && length(x_marks) != length(y_marks)) {
+      stop("'x_marks' and 'y_marks' must have the same length.")
+    }
+    
+    y_rng <- range(long_df$value, na.rm = TRUE)
+    y_span <- diff(y_rng)
+    if (!is.finite(y_span) || y_span == 0) y_span <- max(abs(y_rng), na.rm = TRUE)
+    if (!is.finite(y_span) || y_span == 0) y_span <- 1
+    
+    mark_df <- tibble(
+      x = as.numeric(x_marks),
+      y = if(is.null(y_marks)) y_rng[2] - 0.03 * y_span else as.numeric(y_marks)
+    )
+    tick_half_height <- 0.015 * y_span
+    
+    plt <- plt +
+      geom_segment(data = mark_df,
+                   aes(x = x, xend = x,
+                       y = y - tick_half_height,
+                       yend = y + tick_half_height),
+                   inherit.aes = FALSE,
+                   color = "gray10",
+                   linewidth = 1)
+  } else if (!is.null(y_marks)) {
+    stop("'y_marks' can be provided only together with 'x_marks'.")
+  }
+  
+  return(plt)
 }
 
 # Computes the baseline value of a single trace (vector 'sig')
@@ -150,6 +187,19 @@ step_convolve <- function(sig,
                                                  type = "filter")
 }
 
+# Both rollapply(...) and convolve(..., type = "filter") return a
+# (win-1)-trimmed signal, requiring correction (see next function below)
+correct <- function(value, win_length, type = "+") {
+  correction <- ceiling((win_length - 1)/2)
+  if (type == "+") {
+    return(value + correction)
+  } else if  (type == "-") {
+    return(value - correction)
+  } else {
+    stop("Invalid type!")
+  }
+}
+
 # NOTE: As an additional safeguard, the initial portion of the signal is "muted"
 # and is not included in the detection of collapse events. This prevents the
 # sporadic activity typically observed at the beginning of recordings (in the
@@ -167,17 +217,21 @@ extract <- function(sig,
   
   # Both rollapply(...) and convolve(..., type = "filter") return a
   # (win-1)-trimmed signal, requiring correction.
-  correct <- function(x){ceiling((x-1)/2)}
-  biggest_drop[2] <- biggest_drop[2] + correct(median_width) + correct(length(step_win))
+  biggest_drop[2] |> correct(median_width) |> correct(length(step_win)) -> biggest_drop[2]
   
   # Exclude points above the negative threshold and those points that have a
   # top-most maximum within the range 'k*length(step_win)' ("proximity filter").
   k <- 3
-  ifelse(biggest_drop[1] < -thr &&
-           abs(biggest_drop[2]-biggest_drop[3]) > k*length(step_win) &&
-           abs(biggest_drop[2]-biggest_drop[4]) > k*length(step_win) &&
-           abs(biggest_drop[2]-biggest_drop[5]) > k*length(step_win),
-         biggest_drop[2], NA_integer_)
+  
+  if (biggest_drop[1] < -thr &&
+      abs(biggest_drop[2]-biggest_drop[3]) > k*length(step_win) &&
+      abs(biggest_drop[2]-biggest_drop[4]) > k*length(step_win) &&
+      abs(biggest_drop[2]-biggest_drop[5]) > k*length(step_win))
+  {
+    return(biggest_drop[1:2])
+  } else {
+    return(c(NA_integer_, NA_integer_))
+  }
 }
 
 # AUC of a single normalized trace (vector 'sig') up to collapse (if found) or

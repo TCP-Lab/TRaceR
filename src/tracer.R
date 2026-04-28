@@ -137,12 +137,12 @@ for (fpath in files) {
   mw <- 5 # width of the median pre-filter (median_width)
   step_win <- c(1, 1, 1, -1, -1, -1)
   protect <- 200
-  thr <- 10
-  
   
   raw_traces |> sapply(\(x) x |> step_convolve() |> IQR()) |> median() -> average_noise
-  message("  >>> Average noise estimate: ", round(average_noise, digits = 3))
   thr <- 7*average_noise
+  message("  >>> Average derivative noise factor: ",
+          round(average_noise, digits = 3),
+          " -> Thrshold = ", round(-thr, digits = 3))
   
   # Note here the use of RAW traces to allow for absolute thr values!!
   # It is virtually impossible to define a universal threshold for normalized
@@ -151,20 +151,23 @@ for (fpath in files) {
   # as a result of normalization.
   raw_traces |> sapply(extract, mw, step_win, protect, thr) -> collapse_idx
   
-  collapse_idx |> sapply(\(x)ifelse(is.na(x), NA_real_, time_vec[x])) -> collapse_times
+  collapse_idx[2,] |> sapply(\(x)ifelse(is.na(x), NA_real_, time_vec[x])) -> collapse_times
   
   # Checkpoint for debugging and threshold fine-tuning
   raw_traces |> lapply(step_convolve, mw, step_win) |> as.data.frame() -> conv_traces
-  conv_traces |> select(which(!is.na(collapse_idx))) |> mutate(threshold = -thr) |>
-    plot_traces(title = paste0("Kept: ", sum(!is.na(collapse_idx))),
-                axis_labels = NULL) -> p_conv_kept
-  conv_traces |> select(which(is.na(collapse_idx))) |> mutate(threshold = -thr) |>
-    plot_traces(title = paste0("Discarded: ", sum(is.na(collapse_idx))),
+  conv_traces |> select(which(!is.na(collapse_idx[2,]))) |> mutate(threshold = -thr) |>
+    plot_traces(title = paste0("Kept: ", sum(!is.na(collapse_idx[2,]))),
+                axis_labels = NULL,
+                x_marks = collapse_idx[2,] |> correct(mw, "-") |> correct(length(step_win), "-"),
+                y_marks = collapse_idx[1,]) -> p_conv_kept
+  conv_traces |> select(which(is.na(collapse_idx[2,]))) |> mutate(threshold = -thr) |>
+    plot_traces(title = paste0("Discarded: ", sum(is.na(collapse_idx[2,]))),
                 axis_labels = NULL) -> p_conv_disc
   
   arrange_plots_grid(list(p_conv_kept, p_conv_disc),
                      nrow = 2, ncol = 1, tag_levels = NULL,
-                     title = paste0("Total Traces: ", length(collapse_idx)),
+                     title = paste0("Total Traces: ", length(collapse_idx[2,]),
+                                    " (Threshold = ", round(-thr, digits = 1), ")"),
                      blank_plot = NULL) -> p_conv
   
   # Save the Plot
@@ -177,7 +180,7 @@ for (fpath in files) {
   # --- Descriptive Stats ------------------------------------------------------
   
   # Compute the Area Under the Curve (AUC) up to collapse
-  ROIs |> sapply(\(x)auc(norm_traces[[x]], collapse_idx[x], time_vec)) -> AUCs
+  ROIs |> sapply(\(x)auc(norm_traces[[x]], collapse_idx[2,x], time_vec)) -> AUCs
   
   # Find the maximum of the normalized (and denoised) signal
   norm_traces |> sapply(\(x) x |> denoise() |> max()) -> max_norm
@@ -224,7 +227,7 @@ for (fpath in files) {
   # store Descriptive Stats
   summary_tbl <- tibble(cell = ROIs)
   summary_tbl$F0 <- raw_traces |> sapply(baseline, b_type, b_param)
-  summary_tbl$collapse_idx <- collapse_idx
+  summary_tbl$collapse_idx <- collapse_idx[2,]
   summary_tbl$collapse_times <- collapse_times
   summary_tbl$AUCs <- AUCs
   summary_tbl$max_norm <- max_norm
