@@ -33,8 +33,17 @@ Deficiencies in ATM cause Ataxia-telangiectasia, characterized by neurodegenerat
 - OMO: activator of NRF2 (a ROS-protective gene expression program)
 - CBX: carbenoxolone (gap junction and pannexin-1 blocker)
 - Gd: gadolinium (calcium channel blocker)
-- TROLOX: Analogue of Vitamin E (antioxidant agent)
+- RR: Ruthenium Red (inhibitor of TRP channels, TRPV in particular)
+- DFO: deferoxamine (iron chelator)
+- BAPTA: selective calcium chelator
+- TROLOX: analogue of Vitamin E (antioxidant agent)
+- U73122: phospholipase C (PLC) inhibitor
 
+1. Batch **KU_Gd_CBX**
+    - KU
+    - KU_CBX
+    - KU_Gd
+    - KU_Gd_CBX
 1. Batch **KU_lessUV_NAC**
     - DMSO
     - DMSO_NAC
@@ -46,14 +55,21 @@ Deficiencies in ATM cause Ataxia-telangiectasia, characterized by neurodegenerat
     - KU
     - KU_OMO_24h
     - KU_OMO_48h
-1. Batch **KU_Gd_CBX**
+1. Batch **KU_RR_DFO_BAPTA**
     - KU
-    - KU_CBX
-    - KU_Gd
-    - KU_Gd_CBX
-1. Batch **KU_TROLOX**
+    - KU_BAPTA
+    - KU_DFO
+    - KU_RR
+1. Batch **KU_TROL500** (500 µM 1h-preincubation)
+    - KU
+    - KU_TROL500
+    - KU_TROL500_30m
+1. Batch **KU_TROLOX** (100 µM O/N)
     - KU
     - KU_TROLOX
+1. Batch **KU_U7**
+    - KU
+    - KU_U7
 
 ## Data Format
 The input data must be organized as follows: for each batch (*KU_OMO*, *KU_lessUV_NAC*, etc.), there must be a folder containing a subfolder for each condition (e.g., *DMSO*, *KU*, *KU_NAC*, etc.).
@@ -93,7 +109,7 @@ Blank lines allowed, as well as comment lines introduced by `#`.
 ### Recording Length
 The standard duration of each experiment should be exactly 900 seconds, at a sampling rate of 1 second.
 The following files are exceptions.
-However, given the experimental conditions, we believe they do not introduce statistical artifacts.
+However, given the particular experimental condition they belong to (eliciting just small or no responses), we believe they do not introduce statistical artifacts.
 
 Only **600 time samples** for `./data/in/KU_lessUV_NAC/DMSO` experiments
 - 250908_011_DMSO.csv
@@ -102,6 +118,13 @@ Only **600 time samples** for `./data/in/KU_lessUV_NAC/DMSO` experiments
 
 Only **700 time samples** for `./data/in/KU_lessUV_NAC/KU_NAC` experiments
 - 250908_045_KU_NAC.csv
+
+In fact, recordings from `./data/in/KU_TROL500/KU_TROL500_30m`
+- 260329b_510_KU_TROL500_30m.csv
+- 260329b_511_KU_TROL500_30m.csv
+- 260329b_610_KU_TROL500_30m.csv
+- 260329b_611_KU_TROL500_30m.csv
+are the only ones that cannot be compared with the others, as they are twice as long as the standard duration (30 minutes vs 900 seconds).
 
 ### CSV separators
 `./data/in/KU_OMO/KU/251113_011_KU.csv` was the only CSV input file with a different separator convention, even though it used the same file encoding, `UTF-16LE` (with BOM).
