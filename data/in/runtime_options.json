@@ -1,0 +1,14 @@
+{
+    "baseline": {
+        "comment": "Set 'relative: true' to compute F0 over a fraction of initial samples as specified by 'parameter' value (from 0 to 1). On the contrary, if 'relative: false', 'parameter' indicates the actual number of samples to be used to compute the baseline value F0.",
+        "relative": false,
+        "parameter": 10
+    },
+    "collapse": {
+        "comment": "'median_width' (odd number recommended) is the width of the median pre-filter, 'step_win' is the (un-normalized) convolution window to be used for event detection, 'protect' indicates the number of initial time samples to exclude from the drop-off detection, 'noise_factor' is the multiplicative factor applied to the noise of the processed (convoluted) signal to get the final (negative) threshold.",
+        "median_width": 5,
+        "step_win": [1, 1, 1, -1, -1, -1],
+        "protect": 200,
+        "noise_factor": 7
+    }
+}

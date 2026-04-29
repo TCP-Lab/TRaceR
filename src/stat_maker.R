@@ -63,7 +63,7 @@ for (condition in conditions) {
   for (i in idx) {
     
     files[i] |> basename() |> sub(file_pattern, "", x=_) -> exp_id
-    message("  >> Processing: ", exp_id)
+    message("   >> Processing: ", exp_id)
     
     # --- Experiment Stats -----------------------------------------------------
     
@@ -83,7 +83,7 @@ for (condition in conditions) {
     write.csv(summary_stats,
               file = paste0(out_summary, ".csv"),
               row.names = TRUE)
-    message("  >>> Experiment report written to:\n",
+    message("    >>> Experiment report written to:\n",
             "      ", out_summary, " (csv)")
     
     # Store in the master list
@@ -119,10 +119,10 @@ list.files(in_dir,
            ignore.case = TRUE) -> comp_files
 
 if (length(comp_files) == 0) {
-  cat("WARNING: comparison definition unavailable... skip this batch!")
+  warning("Comparison definition unavailable... skip this batch!")
   quit(status = 1)
 } else if (length(comp_files) > 1) {
-  cat("WARNING: multiple comparison definitions available: taking one...")
+  warning("Multiple comparison definitions available: taking one...")
 }
 comp_files[1] |> read.delim(header = FALSE,
                             sep = "\n",
@@ -137,7 +137,7 @@ fois <- c("F0", "max_norm", "collapse_rate", "collapse_times",
 # Make all the planned comparisons
 for (comp in comparisons) {
   
-  message(" \nContrast: ", comp)
+  message("  > Contrast: ", comp)
   
   # Parse the contrast
   comp |> strsplit(" -- ") |> unlist() |> {\(x)x[1]}() -> cond
@@ -145,12 +145,13 @@ for (comp in comparisons) {
   
   # Check group name consistency
   if(any(! c(cond, ref) %in% names(data_points))) {
-    warning(paste0("Inconsistent group names in comparison (", comp, "). Contrast skipped!"))
+    message(paste0("WARNING: Inconsistent group names in comparison (",
+                   comp, "). Contrast skipped!"))
     next
   }
   
   # Perform t-test, catching errors (e.g., zero variance, low sample size, ...)
-  message("  > Doing the t-test")
+  message("   >> Doing the t-test")
   
   # arcsine square-root transformation to stabilize variance
   asin_sqrt <- function(x) {asin(sqrt(x/100))}
@@ -173,7 +174,7 @@ for (comp in comparisons) {
     }) -> pvals_t
   
   # Perform Wilcoxon Rank-Sum (aka Mann-Whitney U) test
-  message("  > Doing the U-test")
+  message("   >> Doing the U-test")
   fois |> sapply(function(feature) {
     tryCatch(
       wilcox.test(x = as.numeric(data_points[[ref]][feature,]),
@@ -185,7 +186,7 @@ for (comp in comparisons) {
   }) -> pvals_U
   
   # Draw a box plot per feature
-  message("  > Making box plots")
+  message("   >> Making box plots")
   fois |> lapply(function(feature) {
     ttest_boxplot(x = data_points[[ref]][feature,],
                   y = data_points[[cond]][feature,],

@@ -5,6 +5,7 @@ log*.txt
 /ref/
 
 .kerblam
+
 # History files
 .Rhistory
 .Rapp.history

@@ -19,8 +19,16 @@ source("./src/util_functions.R")
 # Extract command-line arguments.
 in_dir <- commandArgs(trailingOnly = TRUE)[1]
 out_dir <- commandArgs(trailingOnly = TRUE)[2]
+bsln_rel <- ifelse(commandArgs(trailingOnly = TRUE)[3] == "true", T, F)
+bsln_param <- as.numeric(commandArgs(trailingOnly = TRUE)[4])
+median_width <- as.numeric(commandArgs(trailingOnly = TRUE)[5])
+commandArgs(trailingOnly = TRUE)[6] |> gsub("\\[|\\]", "", x=_) |>
+  strsplit(",") |> unlist() |> as.numeric() -> step_win
+protect <- as.numeric(commandArgs(trailingOnly = TRUE)[7])
+noise_factor <- as.numeric(commandArgs(trailingOnly = TRUE)[8])
 
 # # Interactive debug (from the project root directory)
+
 # in_dir <- "./data/in/KU_lessUV_NAC/KU"
 # out_dir <- "./data/out/KU_lessUV_NAC/KU"
 #
@@ -33,10 +41,12 @@ out_dir <- commandArgs(trailingOnly = TRUE)[2]
 # in_dir <- "./data/in/KU_OMO/KU"
 # out_dir <- "./data/out/KU_OMO/KU"
 
-# b_type <- "rel"
-# b_param <- 0.10   # Fraction of initial samples to compute F0 (first 10%)
-b_type <- "abs"
-b_param <- 10     # Number of initial samples to be considered for F0
+# bsln_rel <- FALSE
+# bsln_param <- 10
+# median_width <- 5
+# step_win <- c(1, 1, 1, -1, -1, -1)
+# protect <- 200
+# noise_factor <- 7
 
 # --- Data Loading -------------------------------------------------------------
 
@@ -56,17 +66,18 @@ if (length(files) == 0) {
 # To collect final stats
 all_summary_list <- list()
 
-# Loop over experiments
+# Loop over experiments (biological replicates)
 for (fpath in files) {
   
-  message("  >> Processing: ", basename(fpath))
+  message("   >> Processing: ", basename(fpath))
+  # Strip extension
   fpath |> basename() |> sub(file_pattern, "", x=_) -> exp_id
   
   # Read the entire CSV. Mind the special format:
   # - , for decimal point
   # - ; as field separator
   # - skip the first row
-  # - using the second row for heading
+  # - use the second row for heading
   # - fileEncoding "UTF-16LE" (with BOM)
   fpath |> read.table(header = TRUE,
                       sep = ";",
@@ -83,7 +94,7 @@ for (fpath in files) {
   # Expect first column to be the vector of time samples
   time_vec <- raw_traces$Time
   if (any(is.na(time_vec))) {
-    warning("  >>> NAs in Time vector!")
+    message("    >>> WARNING: NAs in Time vector!")
   }
   time_vec |> diff() |> median() -> dt # Sampling time
   # Signals are the remaining columns
@@ -96,7 +107,7 @@ for (fpath in files) {
   # Store ROI names
   ROIs <- colnames(raw_traces)
   
-  message("  >>> ", ncol(raw_traces), " ROIs x ",
+  message("    >>> ", ncol(raw_traces), " ROIs x ",
           nrow(raw_traces), " time samples",
           " (dt = ", round(dt, digits = 3), " s) - fluoIQR (a.u.): ",
           round(IQR(unlist(raw_traces), na.rm = TRUE), digits = 2))
@@ -120,7 +131,7 @@ for (fpath in files) {
   
   # --- Normalize Traces -------------------------------------------------------
   
-  raw_traces |> lapply(normalize, b_type, b_param) |> as.data.frame() -> norm_traces
+  raw_traces |> lapply(normalize, bsln_rel, bsln_param) |> as.data.frame() -> norm_traces
   
   p_norm <- plot_traces(norm_traces, time_vec,
                         title = paste("Normalized traces (dF/F0):", exp_id),
@@ -134,31 +145,35 @@ for (fpath in files) {
   
   # --- Collapse Detection -----------------------------------------------------
   
-  mw <- 5 # width of the median pre-filter (median_width)
-  step_win <- c(1, 1, 1, -1, -1, -1)
-  protect <- 200
+  # Convolution processing
+  raw_traces |> lapply(step_convolve, median_width, step_win) |> as.data.frame() -> conv_traces
   
-  raw_traces |> sapply(\(x) x |> step_convolve() |> IQR()) |> median() -> average_noise
-  thr <- 7*average_noise
-  message("  >>> Average derivative noise factor: ",
+  # Threshold definition
+  conv_traces |> sapply(IQR) |> median() -> average_noise
+  thr <- noise_factor * average_noise
+  message("    >>> Average derivative noise factor: ",
           round(average_noise, digits = 3),
           " -> Thrshold = ", round(-thr, digits = 3))
   
   # Note here the use of RAW traces to allow for absolute thr values!!
-  # It is virtually impossible to define a universal threshold for normalized
-  # traces because the range of the y-axis--being a function of the baseline
-  # values (F0)--is much more variable. However, the drop points do not change
-  # as a result of normalization.
-  raw_traces |> sapply(extract, mw, step_win, protect, thr) -> collapse_idx
+  # When a fixed, absolute threshold was used, it was virtually impossible to
+  # find a universal value fitting all normalized experiments, since, after
+  # normalization, the range of the y-axis strongly depended on the baseline
+  # value (F0 is at the denominator) making normalized traces much more variable
+  # than raw ones. Now that the threshold is adaptively computed from the IQR
+  # noise, things should be almost (?) the same. However, noise can be most
+  # reliably estimated from raw signals and the drop points are not affected
+  # by y-axis normalization. For these reasons, we stuck to the raw traces.
+  raw_traces |> sapply(extract, median_width, step_win, protect, thr) -> collapse_idx
   
+  # Convert indexes to times
   collapse_idx[2,] |> sapply(\(x)ifelse(is.na(x), NA_real_, time_vec[x])) -> collapse_times
   
   # Checkpoint for debugging and threshold fine-tuning
-  raw_traces |> lapply(step_convolve, mw, step_win) |> as.data.frame() -> conv_traces
   conv_traces |> select(which(!is.na(collapse_idx[2,]))) |> mutate(threshold = -thr) |>
     plot_traces(title = paste0("Kept: ", sum(!is.na(collapse_idx[2,]))),
                 axis_labels = NULL,
-                x_marks = collapse_idx[2,] |> correct(mw, "-") |> correct(length(step_win), "-"),
+                x_marks = collapse_idx[2,] |> correct(median_width, "-") |> correct(length(step_win), "-"),
                 y_marks = collapse_idx[1,]) -> p_conv_kept
   conv_traces |> select(which(is.na(collapse_idx[2,]))) |> mutate(threshold = -thr) |>
     plot_traces(title = paste0("Discarded: ", sum(is.na(collapse_idx[2,]))),
@@ -198,8 +213,8 @@ for (fpath in files) {
   
   # Onset Time, defined as the time before the (denoised) signal crosses the
   # 5-times noise-level of the baseline (five-sigma criterion)
-  baseline_length <- ifelse(b_type == "abs", b_param,
-                            ceiling(length(time_vec)*b_param))
+  baseline_length <- ifelse(!bsln_rel, bsln_param,
+                            ceiling(length(time_vec) * bsln_param))
   norm_traces[1:baseline_length,] |> apply(2,sd) |> {\(x)5*x}() -> t5s_vals
   
   ROIs |> sapply(\(x){
@@ -226,7 +241,7 @@ for (fpath in files) {
   
   # store Descriptive Stats
   summary_tbl <- tibble(cell = ROIs)
-  summary_tbl$F0 <- raw_traces |> sapply(baseline, b_type, b_param)
+  summary_tbl$F0 <- raw_traces |> sapply(baseline, bsln_rel, bsln_param)
   summary_tbl$collapse_idx <- collapse_idx[2,]
   summary_tbl$collapse_times <- collapse_times
   summary_tbl$AUCs <- AUCs
@@ -248,7 +263,7 @@ for (fpath in files) {
   saveRDS(summary_tbl,
           file = paste0(out_summary, ".rds"))
 
-  message("  >>> Per-cell stats written to:\n",
+  message("    >>> Per-cell stats written to:\n",
           "      ", out_summary, " (csv + rds)")
   
 }

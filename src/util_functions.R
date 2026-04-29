@@ -82,13 +82,14 @@ plot_traces <- function(df,
 }
 
 # Computes the baseline value of a single trace (vector 'sig')
-baseline <- function(sig, type = "abs", param)
+baseline <- function(sig, relative = FALSE, param)
 {
-  if (type == "abs") {
+  if (!relative) {
     # Compute baseline over a fixed number of time samples
     n_baseline <- round(param, 0)
-  } else if (type == "rel") {
-    # Compute baseline (F0) as median of first baseline_frac portion
+  } else {
+    # Compute baseline over the first 'param' portion
+    param <- ifelse(param >= 1, 1, param)
     n_baseline <- ceiling(length(sig) * param)
   }
   # Compute the baseline
@@ -99,9 +100,9 @@ baseline <- function(sig, type = "abs", param)
 }
 
 # Normalizes a single trace (vector 'sig')
-normalize <- function(sig, b_type = "abs", b_param = 10)
+normalize <- function(sig, bsln_rel = FALSE, bsln_param = 10)
 {
-  F0 <- baseline(sig, b_type, b_param)
+  F0 <- baseline(sig, bsln_rel, bsln_param)
   (sig - F0) / F0
 }
 
@@ -137,7 +138,7 @@ nth.peaks <- function(x, n, min_h = 5)
             threshold = 0.5 # required drop from the peak to neighbors
   ) -> peak_list
   
-  if(is.null(peak_list)) {
+  if (is.null(peak_list)) {
     peak_list <- matrix(0,1,4) # Standard 'findpeaks' output has 4 columns
   }
   if (nrow(peak_list) < n) {
@@ -145,11 +146,6 @@ nth.peaks <- function(x, n, min_h = 5)
   }
   
   peak_list[order(peak_list[,1], decreasing = TRUE)[1:n], ]
-}
-
-# Get a stable estimate of signal noise
-noise_estim <- function(sig) {
-  sig |> step_convolve() |> IQR()
 }
 
 # --- Feature extraction -------------------------------------------------------
@@ -181,10 +177,12 @@ step_convolve <- function(sig,
   # sensors or alike, in any case not representing the true collapse events we
   # are interested in (robustness). Median removes spikes, without altering or
   # smoothing long-lasting signal components.
-  sig |> rollapply(width = median_width,
-                   FUN = median,
-                   align = "center") |> convolve(rev(win),
-                                                 type = "filter")
+  sig |>
+    rollapply(width = median_width,
+              FUN = median,
+              align = "center") |>
+    convolve(rev(win),
+             type = "filter")
 }
 
 # Both rollapply(...) and convolve(..., type = "filter") return a
@@ -209,7 +207,7 @@ extract <- function(sig,
                     median_width = 5, # odd number here, please!
                     step_win = c(1, 1, 1, -1, -1, -1),
                     protect = 0, # to exclude the initial part of the signal (up to index 'protect')
-                    thr = 5)
+                    thr = 20)
 {
   sig |> step_convolve(median_width, step_win) |>
     {\(x) c(rep(0,protect), x[(protect+1):length(x)])}() |> # cancel the protected part
@@ -222,7 +220,6 @@ extract <- function(sig,
   # Exclude points above the negative threshold and those points that have a
   # top-most maximum within the range 'k*length(step_win)' ("proximity filter").
   k <- 3
-  
   if (biggest_drop[1] < -thr &&
       abs(biggest_drop[2]-biggest_drop[3]) > k*length(step_win) &&
       abs(biggest_drop[2]-biggest_drop[4]) > k*length(step_win) &&

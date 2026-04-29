@@ -10,6 +10,16 @@ source ./src/bash_commons.sh
 in_path="./data/in/"
 out_path="./data/out/"
 
+# Set variables from runtime option JSON file
+OPTS="./data/in/runtime_options.json"
+
+bsln_rel="$(cat $OPTS | jq -r ".baseline.relative")"
+bsln_param="$(cat $OPTS | jq -r ".baseline.parameter")"
+median_width="$(cat $OPTS | jq -r ".collapse.median_width")"
+step_win="$(cat $OPTS | jq -r ".collapse.step_win")"
+protect="$(cat $OPTS | jq -r ".collapse.protect")"
+noise_factor="$(cat $OPTS | jq -r ".collapse.noise_factor")"
+
 # --- The pipeline starts here -------------------------------------------------
 echo -e "\n${mag}STARTING TRaceR${end}"
 
@@ -34,7 +44,13 @@ do
 	# Run the TRaceR
 	Rscript --vanilla "./src/tracer.R" \
 		"$sub_folder" \
-		"$out_sub_folder"
+		"$out_sub_folder" \
+		"$bsln_rel" \
+		"$bsln_param" \
+		"$median_width" \
+		"$step_win" \
+		"$protect" \
+		"$noise_factor"
 done
 
 echo -e "\n${grn}STEP 2: Stat_Maker${end}"
