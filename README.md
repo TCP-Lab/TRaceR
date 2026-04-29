@@ -15,7 +15,23 @@ kerblam run tracer 2>&1 | tee ./data/out/log.txt
 ```
 to save it locally.
 
-You can also run `stat_tracer :: TRaceR - Statistical Analysis Only` if you want to run only the statistical analysis step, following the time course analysis.
+You can also run `stat_tracer :: TRaceR - Statistical Analysis Only` if you want to run only the statistical analysis step, following the first step of time course analysis.
+
+## Requisites
+**R packages**
+- r4tcpl
+- stats
+- dplyr
+- tidyr
+- ggplot2
+- patchwork
+- zoo
+- pracma
+
+**Kerblam!** (>= 1.2.1)
+
+---
+---
 
 ## Biological Model
 Primary cell cultures of mouse cerebellar granules for the study of pharmacologically-induced *ataxia-telangiectasia*.
@@ -24,6 +40,13 @@ ATM (Ataxia-telangiectasia mutated) is a crucial serine/threonine protein kinase
 As a central regulator of the DNA damage response (DDR), ATM phosphorylates substrates like p53, BRCA1, and Nbs1 to maintain genomic stability.
 Beyond DNA damage, ATM functions as a sensor for oxidative stress, managing reactive oxygen species (ROS) levels.
 Deficiencies in ATM cause Ataxia-telangiectasia, characterized by neurodegeneration.
+
+## Biological Readout
+The response of cerebellar granules to UV stimulation for the induction of ROS production was recorded by sampling (1 Hz) their cytosolic calcium concentration using the non-ratiometric, green-emitting FLUO-4 probe, which features a maximum excitation at 488 nm (since FURA-2, which is excited in the UV range, would have interfered with the treatment).
+
+Data matrices from these fluorescence measurements are used as the input data of *TRaceR*.
+Each one of them corresponds to an independent biological observation of intracellular calcium dynamics, performed under some specific experimental condition.
+Within such matrices, each column represents from a different Region Of Interest (ROI), corresponding to a single-cell trace. 
 
 ## Experimental Conditions
 - DMSO: control condition (KU vehicle - always present)
@@ -91,19 +114,6 @@ Contrasts need to be defined inside the input folder of each batch through a pla
 condition -- reference
 ```
 Blank lines allowed, as well as comment lines introduced by `#`.
-
-## Requisites
-**R packages**
-- r4tcpl
-- stats
-- dplyr
-- tidyr
-- ggplot2
-- patchwork
-- zoo
-- pracma
-
-**Kerblam!** (>= 1.2.1)
 
 ## Anomalies
 ### Recording Length

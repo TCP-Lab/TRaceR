@@ -159,9 +159,9 @@ for (fpath in files) {
   # When a fixed, absolute threshold was used, it was virtually impossible to
   # find a universal value fitting all normalized experiments, since, after
   # normalization, the range of the y-axis strongly depended on the baseline
-  # value (F0 is at the denominator) making normalized traces much more variable
-  # than raw ones. Now that the threshold is adaptively computed from the IQR
-  # noise, things should be almost (?) the same. However, noise can be most
+  # value (F0 being at the denominator) making normalized traces much more
+  # variable than raw ones. Now that the threshold is adaptively computed from
+  # IQR noise, things should be almost (?) the same. However, noise can be most
   # reliably estimated from raw signals and the drop points are not affected
   # by y-axis normalization. For these reasons, we stuck to the raw traces.
   raw_traces |> sapply(extract, median_width, step_win, protect, thr) -> collapse_idx
